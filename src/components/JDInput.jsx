@@ -1,11 +1,25 @@
 import { useState } from "react";
+import { searchCandidates } from "../services/api";
 
-const JDInput = () => {
+const JDInput = ({ onSearch, loading }) => {
   const [jd, setJd] = useState("");
+  const [skills, setSkills] = useState("");
+  const [topK, setTopK] = useState(5);
+  const [location, setLocation] = useState("");
 
-  const handleSubmit = () => {
-    console.log("JD Submitted:", jd);
-    alert("JD submitted (dummy)");
+  const handleSubmit = async () => {
+    if (!jd.trim()) return;
+    await onSearch(() =>
+      searchCandidates({
+        jobDescription: jd,
+        requiredSkills: skills
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        topK,
+        location: location || undefined,
+      })
+    );
   };
 
   return (
@@ -20,8 +34,32 @@ const JDInput = () => {
         onChange={(e) => setJd(e.target.value)}
       />
 
-      <br /><br />
-      <button onClick={handleSubmit}>Search Candidates</button>
+      <div className="form-row">
+        <input
+          type="text"
+          placeholder="Required skills (comma separated)"
+          value={skills}
+          onChange={(e) => setSkills(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Preferred location (optional)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <input
+          type="number"
+          min="1"
+          max="20"
+          value={topK}
+          onChange={(e) => setTopK(Number(e.target.value))}
+        />
+      </div>
+
+      <br />
+      <button onClick={handleSubmit} disabled={loading}>
+        {loading ? "Searching..." : "Search Candidates"}
+      </button>
     </div>
   );
 };

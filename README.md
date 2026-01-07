@@ -1,16 +1,38 @@
-# React + Vite
+# SmartHire – Resume-aware HR RAG Prototype
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+End-to-end minimal working prototype:
+- Backend: FastAPI with PDF ingestion, resume parsing, semantic embedding, and candidate search.
+- Frontend: React (Vite) UI for uploading resumes and searching with a job description.
 
-Currently, two official plugins are available:
+## Backend (FastAPI)
+```bash
+cd Backend/app
+python -m venv .venv
+.venv\Scripts\activate       # on Windows
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Key endpoints:
+- `GET /api/health` – index status
+- `POST /api/resumes` – upload PDF resume (multipart form)
+- `POST /api/search` – search with job_description, required_skills, top_k, location
 
-## React Compiler
+Data is stored locally in `data/resumes.json`. Temp PDFs are written to `temp/`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Frontend (React)
+```bash
+cd ..
+npm install
+npm run dev   # defaults to http://localhost:5173
+```
 
-## Expanding the ESLint configuration
+API base defaults to `http://localhost:8000/api`. Override with `VITE_API_BASE`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## What works now
+- Upload a resume PDF → parse text → extract skills/experience/email/phone → embed and index.
+- Submit a JD + required skills → semantic + skill-overlap ranking → explanations with matched skills and raw text snippet.
+
+## Notes / Next Steps
+- Swap the embedding model or add reranking as needed.
+- Add authentication, PII handling, and persistence (Postgres/pgvector) for production.
