@@ -1,22 +1,29 @@
 import { useState } from "react";
+import { uploadResume } from "../services/api";
 
 const ResumeUpload = () => {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file) {
-      setStatus("Please select a PDF file");
+      setStatus("❌ Please select a PDF file");
       return;
     }
-    setStatus("Uploading...");
-    setTimeout(() => {
-      setStatus("Resume uploaded successfully");
-    }, 1500);
+
+    setStatus("⏳ Uploading resume...");
+
+    try {
+      const response = await uploadResume(file);
+      setStatus(`✅ ${response.message}`);
+    } catch (error) {
+      console.error(error);
+      setStatus("❌ Upload failed. Check backend.");
+    }
   };
 
   return (
-    <div>
+    <div style={{ padding: "20px", border: "1px solid #ccc" }}>
       <h2>Upload Resume</h2>
 
       <input
@@ -26,6 +33,7 @@ const ResumeUpload = () => {
       />
 
       <br /><br />
+
       <button onClick={handleUpload}>Upload</button>
 
       <p>{status}</p>

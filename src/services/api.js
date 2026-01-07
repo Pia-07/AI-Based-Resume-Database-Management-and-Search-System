@@ -1,9 +1,15 @@
-// Backend API calls will go here later
-
 export const uploadResume = async (file) => {
-  // placeholder
-};
+  const formData = new FormData();
+  formData.append("file", file);
 
-export const submitJD = async (jdText) => {
-  // placeholder
+  const response = await fetch("http://127.0.0.1:8000/upload_resume", {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error("Upload failed");
+  }
+
+  return response.json();
 };
