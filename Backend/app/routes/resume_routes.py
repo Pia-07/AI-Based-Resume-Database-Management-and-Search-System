@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -67,6 +68,17 @@ async def upload_resume(
             "experience_years": parsed["experience_years"],
             "location": parsed.get("location"),
         },
+=======
+from fastapi import APIRouter, UploadFile, File
+
+router = APIRouter()
+
+@router.post("/upload_resume")
+async def upload_resume(file: UploadFile = File(...)):
+    return {
+        "message": "Resume uploaded successfully",
+        "resume_id": "uuid"
+>>>>>>> bd3bed210af2ea99ac8470389e356018c97d1c83
     }
 
 

@@ -10,9 +10,10 @@ const ResumeUpload = () => {
 
   const handleUpload = async () => {
     if (!file) {
-      setStatus("Please select a PDF file");
+      setStatus("❌ Please select a PDF file");
       return;
     }
+<<<<<<< HEAD
     setLoading(true);
     setStatus("Uploading...");
     try {
@@ -25,11 +26,22 @@ const ResumeUpload = () => {
       setStatus(err.message || "Upload failed");
     } finally {
       setLoading(false);
+=======
+
+    setStatus("⏳ Uploading resume...");
+
+    try {
+      const response = await uploadResume(file);
+      setStatus(`✅ ${response.message}`);
+    } catch (error) {
+      console.error(error);
+      setStatus("❌ Upload failed. Check backend.");
+>>>>>>> bd3bed210af2ea99ac8470389e356018c97d1c83
     }
   };
 
   return (
-    <div>
+    <div style={{ padding: "20px", border: "1px solid #ccc" }}>
       <h2>Upload Resume</h2>
 
       <div className="form-row">
@@ -53,11 +65,17 @@ const ResumeUpload = () => {
         onChange={(e) => setFile(e.target.files[0])}
       />
 
+<<<<<<< HEAD
       <br />
       <br />
       <button onClick={handleUpload} disabled={loading}>
         {loading ? "Uploading..." : "Upload"}
       </button>
+=======
+      <br /><br />
+
+      <button onClick={handleUpload}>Upload</button>
+>>>>>>> bd3bed210af2ea99ac8470389e356018c97d1c83
 
       <p>{status}</p>
     </div>

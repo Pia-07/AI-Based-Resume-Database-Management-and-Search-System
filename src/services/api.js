@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 export const uploadResume = async (file, payload = {}) => {
@@ -42,4 +43,20 @@ export const searchCandidates = async ({
   }
 
   return res.json();
+=======
+export const uploadResume = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("http://127.0.0.1:8000/upload_resume", {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error("Upload failed");
+  }
+
+  return response.json();
+>>>>>>> bd3bed210af2ea99ac8470389e356018c97d1c83
 };
