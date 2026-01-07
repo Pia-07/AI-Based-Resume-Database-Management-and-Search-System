@@ -1,9 +1,10 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+from .routes.resume_routes import router as resume_router
 
-# CORS (required for React)
+app = FastAPI()   # ✅ THIS is what uvicorn loads
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -12,14 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# attach all routers here
+app.include_router(resume_router)
+
 @app.get("/")
 def root():
-    return {"status": "Backend running"}
-
-@app.post("/upload_resume")
-async def upload_resume(file: UploadFile = File(...)):
-    return {
-        "filename": file.filename,
-        "content_type": file.content_type,
-        "message": "Resume uploaded successfully"
-    }
+    return {"status": "API running"}
