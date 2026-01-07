@@ -5,9 +5,14 @@ const Explanation = ({ candidate, onBack }) => {
 
       <div style={{ border: "1px solid #aaa", padding: "15px" }}>
         <p>
-          <strong>{candidate.name}</strong> was selected because:
+          <strong>{candidate.name}</strong> — Score {candidate.score}
         </p>
-        <p>{candidate.justification}</p>
+        <p>Matched skills: {(candidate.matched_skills || []).join(", ") || "n/a"}</p>
+        <p>Experience: {candidate.experience_years ?? "n/a"} years</p>
+        <p>Location: {candidate.location || "n/a"}</p>
+        <p>Semantic score: {candidate.semantic_score}</p>
+        <p>Skill overlap: {candidate.skill_overlap}</p>
+        <p style={{ whiteSpace: "pre-wrap" }}>{candidate.summary}</p>
       </div>
 
       <br />
