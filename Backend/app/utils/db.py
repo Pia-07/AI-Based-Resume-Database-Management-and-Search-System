@@ -8,3 +8,4 @@ db = client["smarthire_db"]
 
 resume_collection = db["resumes"]
 job_collection = db["jobs"]
+user_collection = db["users"]
