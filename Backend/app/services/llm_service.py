@@ -1,16 +1,28 @@
+import openai
 import os
-from openai import OpenAI
+from dotenv import load_dotenv
 
-def get_client():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not set")
-    return OpenAI(api_key=api_key)
+load_dotenv()  # load .env file
 
-def generate_answer(context: str, query: str) -> str:
-    client = get_client()
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=f"Context:\n{context}\n\nQuestion:\n{query}"
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def generate_answer(context, question):
+    prompt = f"""
+You are an AI recruiter assistant.
+
+Use the following resumes:
+{context}
+
+Answer this question:
+{question}
+"""
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert recruiter"},
+            {"role": "user", "content": prompt}
+        ]
     )
-    return response.output_text
+
+    return response.choices[0].message.content
