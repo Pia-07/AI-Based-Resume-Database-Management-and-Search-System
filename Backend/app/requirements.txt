@@ -1,17 +1,1 @@
-<<<<<<< HEAD
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pdfplumber>=0.11.0
-python-multipart>=0.0.9
-sentence-transformers>=3.0.1
-numpy>=1.26.0
-
-=======
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pdfplumber>=0.11.0
-python-multipart>=0.0.9
-sentence-transformers>=3.0.1
-numpy>=1.26.0
-
->>>>>>> cffba6ef64ed296d8c4df653b6d3296f72cfa3da
+python-dotenv==1.2.1
