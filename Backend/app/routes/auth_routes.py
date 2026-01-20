@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import uuid
 from ..utils.db import user_collection
-from ..utils.security import verify_password
+from ..utils.security import verify_password, hash_password
 
 
 router = APIRouter()
@@ -52,3 +52,4 @@ def login(data: AuthRequest):
         "message": "Login successful",
         "user_id": user["user_id"]
     }
+
