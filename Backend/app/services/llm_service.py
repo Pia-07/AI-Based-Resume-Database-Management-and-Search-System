@@ -1,10 +1,10 @@
-import openai
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
 
-load_dotenv()  # load .env file
+load_dotenv()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def generate_answer(context, question):
     prompt = f"""
@@ -17,7 +17,7 @@ Answer this question:
 {question}
 """
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are an expert recruiter"},
