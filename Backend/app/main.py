@@ -1,9 +1,16 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes.resume_routes import router as resume_router
 from .routes.auth_routes import router as auth_router
+<<<<<<< HEAD
 from .routes.chat_routes import router as chat_router   # ✅ ADD THIS
+=======
+from .routes.chat_routes import router as chat_router
+>>>>>>> 5ac6fc4ab4b94ef81a425f6c26c7513b14cffb34
 
 app = FastAPI()
 
@@ -17,6 +24,7 @@ app.add_middleware(
 
 # ✅ Register all routers
 app.include_router(auth_router, prefix="/auth")
+app.include_router(chat_router)
 app.include_router(resume_router)
 app.include_router(chat_router)   # ✅ ADD THIS
 

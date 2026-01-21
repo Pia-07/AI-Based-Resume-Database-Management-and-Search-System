@@ -84,4 +84,8 @@ def parse_resume_text(text: str) -> Dict:
         "raw_text": text,
     }
 
+<<<<<<< HEAD
     return parsed_data
+=======
+    return parsed_data
+>>>>>>> 5ac6fc4ab4b94ef81a425f6c26c7513b14cffb34
