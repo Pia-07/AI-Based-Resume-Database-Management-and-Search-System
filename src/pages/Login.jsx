@@ -16,7 +16,6 @@ const Login = () => {
 
     try {
       setLoading(true);
-
       const response = await loginUser(email, password);
 
       if (response.error) {
@@ -34,7 +33,15 @@ const Login = () => {
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "120px auto" }} className="card">
+    <div
+      className="card"
+      style={{
+        maxWidth: "400px",
+        margin: "120px auto",
+        padding: "25px",
+        boxSizing: "border-box"
+      }}
+    >
       <h2>Login</h2>
 
       <input
@@ -42,7 +49,12 @@ const Login = () => {
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        style={{ width: "100%", padding: "10px", marginBottom: "12px" }}
+        style={{
+          width: "100%",
+          padding: "10px",
+          marginBottom: "12px",
+          boxSizing: "border-box"
+        }}
       />
 
       <input
@@ -50,7 +62,12 @@ const Login = () => {
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", padding: "10px", marginBottom: "12px" }}
+        style={{
+          width: "100%",
+          padding: "10px",
+          marginBottom: "12px",
+          boxSizing: "border-box"
+        }}
       />
 
       <button
