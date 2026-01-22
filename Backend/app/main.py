@@ -6,7 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes.resume_routes import router as resume_router
 from .routes.auth_routes import router as auth_router
+<<<<<<< HEAD
 from .routes.chat_routes import router as chat_router
+=======
+from .routes.chat_routes import router as chat_router   # ✅ ADD THIS
+>>>>>>> 44832f46c10062ee200b2327854daa38c55d70f7
 
 app = FastAPI()
 
