@@ -1,35 +1,54 @@
 from fastapi import APIRouter, UploadFile, File
+from typing import List
 import uuid
 import os
 
+from ..services.resume_service import process_resume
+from ..services.s3_service import generate_presigned_url
 from ..utils.db import resume_collection
-from ..utils.pdf_reader import extract_text_from_pdf
-from ..services.resume_parser import parse_resume_text
 
 router = APIRouter()
 
+TEMP_DIR = "temp"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# =========================
+# UPLOAD MULTIPLE RESUMES
+# =========================
 @router.post("/upload_resume")
-async def upload_resume(file: UploadFile = File(...)):
-    print("🚀 upload_resume API called")
+async def upload_resumes(files: List[UploadFile] = File(...)):
+    results = []
 
-    resume_id = str(uuid.uuid4())
+    for file in files:
+        resume_id = str(uuid.uuid4())
+        file_path = f"{TEMP_DIR}/{resume_id}.pdf"
 
-    os.makedirs("temp", exist_ok=True)
-    file_path = f"temp/{resume_id}.pdf"
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
 
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+        resume_doc = process_resume(file_path, resume_id)
 
-    raw_text = extract_text_from_pdf(file_path)
-    parsed = parse_resume_text(raw_text)
-
-    resume_collection.insert_one({
-        "resume_id": resume_id,
-        "skills": parsed.get("skills", []),
-        "raw_text": raw_text
-    })
+        results.append({
+            "resume_id": resume_id,
+            "name": resume_doc.get("name"),
+            "skills": resume_doc.get("skills"),
+            "experience_years": resume_doc.get("experience_years")
+        })
 
     return {
-        "message": "Resume uploaded successfully",
-        "resume_id": resume_id
+        "message": f"{len(results)} resumes uploaded successfully",
+        "resumes": results
     }
+
+
+# =========================
+# DOWNLOAD RESUME
+# =========================
+@router.get("/download_resume/{resume_id}")
+def download_resume(resume_id: str):
+    resume = resume_collection.find_one({"resume_id": resume_id})
+    if not resume:
+        return {"error": "Resume not found"}
+
+    signed_url = generate_presigned_url(resume["resume_s3_key"])
+    return {"download_url": signed_url}

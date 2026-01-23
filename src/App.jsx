@@ -3,6 +3,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Chatbot from "./pages/Chatbot";
+import Upload from "./pages/Upload";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/chatbot" element={<Chatbot />} />
+        <Route path="/upload" element={<Upload />} />
       </Routes>
     </BrowserRouter>
   );

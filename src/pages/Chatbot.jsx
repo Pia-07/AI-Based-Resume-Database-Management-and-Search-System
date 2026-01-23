@@ -4,16 +4,18 @@ import DashboardLayout from "../layouts/DashboardLayout";
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || loading) return;
 
-    const newMessages = [...messages, { sender: "hr", text: input }];
-    setMessages(newMessages);
+    const userMessage = { sender: "hr", text: input };
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setLoading(true);
 
-    // Thinking indicator
-    setMessages([...newMessages, { sender: "ai", text: "Thinking..." }]);
+    // Temporary thinking message
+    setMessages((prev) => [...prev, { sender: "ai", text: "Thinking..." }]);
 
     try {
       const res = await fetch("http://127.0.0.1:8000/chat", {
@@ -24,12 +26,18 @@ const Chatbot = () => {
 
       const data = await res.json();
 
-      setMessages([...newMessages, { sender: "ai", text: data.reply }]);
-    } catch (err) {
-      setMessages([
-        ...newMessages,
-        { sender: "ai", text: "Server error. Try again." },
+      // Replace "Thinking..." with real answer
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { sender: "ai", text: data.reply || "No response" },
       ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { sender: "ai", text: "❌ Server error. Try again." },
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,6 +71,7 @@ const Chatbot = () => {
                 background: m.sender === "hr" ? "#2563eb" : "#f1f5f9",
                 color: m.sender === "hr" ? "#fff" : "#000",
                 maxWidth: "70%",
+                wordWrap: "break-word",
               }}
             >
               {m.text}
@@ -82,9 +91,12 @@ const Chatbot = () => {
             borderRadius: "8px",
             border: "1px solid #ccc",
           }}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
         />
+
         <button
           onClick={sendMessage}
+          disabled={loading}
           style={{
             marginLeft: "10px",
             padding: "10px 18px",
@@ -93,6 +105,7 @@ const Chatbot = () => {
             border: "none",
             borderRadius: "8px",
             cursor: "pointer",
+            opacity: loading ? 0.7 : 1,
           }}
         >
           Send

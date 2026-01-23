@@ -3,21 +3,26 @@ const BASE_URL = "http://127.0.0.1:8000";
 /* ===========================
    RESUME UPLOAD API
 =========================== */
-export const uploadResume = async (file) => {
+export const uploadResume = async (files) => {
   const formData = new FormData();
-  formData.append("file", file);
 
-  const response = await fetch(`${BASE_URL}/upload_resume`, {
+  files.forEach((file) => {
+    formData.append("files", file); // ✅ must match backend
+  });
+
+  const response = await fetch("http://127.0.0.1:8000/upload_resume", {
     method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
-    throw new Error("Resume upload failed");
+    const err = await response.text();
+    throw new Error(err);
   }
 
   return await response.json();
 };
+
 
 /* ===========================
    CHATBOT (RAG / REAL-TIME)
