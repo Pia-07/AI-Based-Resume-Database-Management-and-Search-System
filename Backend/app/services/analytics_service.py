@@ -45,19 +45,19 @@ def experience_distribution():
 
 # 🟣 LINE — UPLOAD TREND
 def upload_trend():
-    resumes = resume_collection.find({}, {"created_at": 1})
+    resumes = resume_collection.find({})
     counter = Counter()
 
     for r in resumes:
-        date = r.get("created_at")
-        if date:
-            month = date.strftime("%Y-%m")
-            counter[month] += 1
+        ts = r["_id"].generation_time  # Mongo auto timestamp
+        month = ts.strftime("%Y-%m")
+        counter[month] += 1
 
     months = sorted(counter.keys())
+
     return {
         "type": "line",
         "title": "Resume Upload Trend",
         "labels": months,
-        "values": [counter[m] for m in months]
+        "values": [counter[m] for m in months],
     }
