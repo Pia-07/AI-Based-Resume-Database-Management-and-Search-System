@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 from ..services.intent_service import detect_intent
 from ..services.analytics_service import (
     skill_distribution,
@@ -19,55 +20,62 @@ class ChatRequest(BaseModel):
 @router.post("/chat")
 def chat(request: ChatRequest):
     query = request.query.strip().lower()
-
-    # 1️⃣ Detect intent
     intent = detect_intent(query)
 
-    # 2️⃣ Greeting
-    if intent == "greeting":
-        return {"reply": "Hi! I can help you analyze resumes and show insights."}
+    print("🧠 Intent:", intent)
 
-    # 3️⃣ Resume count
+    # 1️⃣ Greeting
+    if intent == "greeting":
+        return {
+            "reply": "Hi! I can search resumes and generate analytics 📊"
+        }
+
+    # 2️⃣ Count resumes
     if intent == "count_resumes":
         count = resume_collection.count_documents({})
-        return {"reply": f"There are {count} resumes in the database."}
+        return {
+            "reply": f"There are {count} resumes in the database."
+        }
 
-    # 4️⃣ Candidate names
+    # 3️⃣ List candidates
     if intent == "list_candidates":
         names = resume_collection.distinct("name")
-        return {"reply": "Candidates:\n" + "\n".join(names)}
+        return {
+            "reply": "Candidates:\n" + "\n".join(names)
+        }
 
-    # 5️⃣ 📊 Skill chart
+    # 4️⃣ 📊 Skill chart
     if intent == "analytics_skill":
-        chart = skill_distribution()
         return {
-            "reply": "Here is the skill distribution across all resumes.",
-            "chart": chart,
+            "reply": "Here is the skill distribution across all candidates:",
+            "chart": skill_distribution()
         }
 
-    # 6️⃣ 📊 Experience chart
+    # 5️⃣ 📊 Experience chart
     if intent == "analytics_experience":
-        chart = experience_distribution()
         return {
-            "reply": "Here is the experience distribution.",
-            "chart": chart,
+            "reply": "Here is the experience distribution:",
+            "chart": experience_distribution()
         }
 
-    # 7️⃣ 📈 Upload trend
+    # 6️⃣ 📈 Upload trend
     if intent == "analytics_trend":
-        chart = upload_trend()
         return {
-            "reply": "Here is the resume upload trend over time.",
-            "chart": chart,
+            "reply": "Here is the resume upload trend over time:",
+            "chart": upload_trend()
         }
 
-    # 8️⃣ 🔍 Semantic search (FAISS)
+    # 7️⃣ Semantic resume Q&A (ONLY here we call LLM)
     resumes = list(resume_collection.find({}, {"_id": 0, "raw_text": 1}))
     build_vector_store(resumes)
 
-    relevant = search_similar(query, k=20)
-    if not relevant:
-        return {"reply": "No relevant resumes found."}
+    results = search_similar(query, k=20)
+    if not results:
+        return {
+            "reply": "I couldn't find relevant resumes for that query."
+        }
 
-    answer = generate_answer("\n\n".join(relevant), query)
-    return {"reply": answer}
+    answer = generate_answer("\n\n".join(results), query)
+    return {
+        "reply": answer
+    }
