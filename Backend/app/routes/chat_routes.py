@@ -10,29 +10,33 @@ class ChatRequest(BaseModel):
     query: str
 
 
-# -------------------------
-# Build vector store ONCE
-# -------------------------
-resumes = list(resume_collection.find({}, {"_id": 0, "raw_text": 1}))
-build_vector_store(resumes)
-
-
-# -------------------------
-# Chat endpoint
-# -------------------------
 @router.post("/chat")
 def chat(request: ChatRequest):
-    query = request.query
+    query = request.query.strip()
 
-    # Retrieve relevant resume chunks
-    relevant_resumes = search_similar(query)
+    # ✅ Handle greetings without FAISS / LLM
+    if query.lower() in ["hi", "hello", "hey"]:
+        return {
+            "reply": "Hi! I can help you analyze and search resumes. What are you looking for?"
+        }
+
+    # 🔥 ALWAYS rebuild FAISS from DB
+    resumes = list(resume_collection.find({}, {"_id": 0, "raw_text": 1}))
+    build_vector_store(resumes)
+
+    relevant_resumes = search_similar(query, k=20)
 
     if not relevant_resumes:
-        return {"reply": "No relevant resumes found."}
+        return {
+            "reply": "No relevant resumes found for your query."
+        }
 
-    context = "\n\n".join(relevant_resumes)
+    # ✅ Generate answer using LLM
+    answer = generate_answer(
+        context="\n\n".join(relevant_resumes),
+        question=query
+    )
 
-    # Generate AI answer
-    answer = generate_answer(context, query)
-
-    return {"reply": answer}
+    return {
+        "reply": answer
+    }

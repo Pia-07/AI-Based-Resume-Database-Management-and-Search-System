@@ -1,28 +1,33 @@
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
+from google import genai
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 def generate_answer(context, question):
     prompt = f"""
 You are an AI recruiter assistant.
 
-Use the following resumes:
+Rules:
+- If the user greets (hi, hello, hey), greet politely.
+- Answer ONLY using the resume data provided.
+- If resume data is not relevant, say so politely.
+
+Resumes:
 {context}
 
-Answer this question:
+User question:
 {question}
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are an expert recruiter"},
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    return response.choices[0].message.content
+    try:
+        response = client.models.generate_content(
+            model="models/gemini-flash-latest",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        print("Gemini error:", e)
+        return "AI service is temporarily unavailable. Please try again."
