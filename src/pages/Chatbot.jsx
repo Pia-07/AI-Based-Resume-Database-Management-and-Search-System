@@ -1,5 +1,7 @@
 import { useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
+import ChartRenderer from "../components/ChartRenderer";
+
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);
@@ -26,11 +28,15 @@ const Chatbot = () => {
 
       const data = await res.json();
 
-      // Replace "Thinking..." with real answer
       setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { sender: "ai", text: data.reply || "No response" },
-      ]);
+  ...prev.slice(0, -1),
+  {
+    sender: "ai",
+    text: data.reply || null,
+    chart: data.chart || null,
+  },
+]);
+
     } catch (err) {
       setMessages((prev) => [
         ...prev.slice(0, -1),
@@ -74,7 +80,8 @@ const Chatbot = () => {
                 wordWrap: "break-word",
               }}
             >
-              {m.text}
+             {m.text && <div>{m.text}</div>}
+  {m.chart && <ChartRenderer chart={m.chart} />}
             </span>
           </div>
         ))}
