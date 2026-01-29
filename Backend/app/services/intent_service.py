@@ -31,6 +31,17 @@ INTENT_EXAMPLES = {
         "experience chart",
         "years of experience"
     ],
+    "analytics_location": [
+    "location chart",
+    "location distribution",
+    "bar chart for locations",
+    "candidates by location"
+],
+"analytics_education": [
+    "education chart",
+    "degree distribution",
+    "qualification breakdown"
+],
     "analytics_trend": [
         "resume upload trend",
         "growth over time",

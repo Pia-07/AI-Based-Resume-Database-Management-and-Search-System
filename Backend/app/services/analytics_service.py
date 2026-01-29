@@ -41,6 +41,16 @@ def experience_distribution():
         "labels": list(buckets.keys()),
         "values": list(buckets.values())
     }
+def location_distribution():
+    resumes = resume_collection.find({}, {"location": 1})
+    counter = Counter(r.get("location", "Unknown") for r in resumes)
+
+    return {
+        "type": "bar",
+        "title": "Location Distribution",
+        "labels": list(counter.keys()),
+        "values": list(counter.values())
+    }
 
 
 # 🟣 LINE — UPLOAD TREND
