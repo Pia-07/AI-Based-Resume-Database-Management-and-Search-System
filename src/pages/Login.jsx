@@ -86,7 +86,7 @@ const Login = () => {
           <div style={styles.formHeader}>
             <h2 style={styles.formTitle}>Welcome Back</h2>
             <p style={styles.formSubtitle}>
-              Sign in to access your AI hiring assistant
+              Login to access your AI hiring assistant
             </p>
           </div>
 
@@ -163,7 +163,7 @@ const Login = () => {
                 Signing in...
               </span>
             ) : (
-              "Sign In"
+              "Login"
             )}
           </button>
 
