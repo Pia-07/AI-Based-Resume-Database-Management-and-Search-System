@@ -1,10 +1,5 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from ..services.response_formatter import (
-    chatgpt_style_reply,
-    list_to_bullets
-)
-
 
 from ..services.intent_service import detect_intent
 from ..services.analytics_service import (
@@ -19,28 +14,40 @@ from ..utils.db import resume_collection
 
 router = APIRouter()
 
+
+# -----------------------------
+# Request Model
+# -----------------------------
 class ChatRequest(BaseModel):
     query: str
 
 
-def chatgpt_style_reply(answer: str):
-    """
-    Makes normal answers look like ChatGPT
-    """
-    return f"""
-🤖 **Here’s what I found based on the resumes:**
+# -----------------------------
+# CTA Decision Logic
+# -----------------------------
+def should_include_cta(intent: str, query: str) -> bool:
+    factual_intents = {
+        "count_resumes",
+        "analytics_location",
+        "analytics_skill",
+        "analytics_experience",
+        "analytics_trend",
+    }
 
-• {answer}
+    # Never CTA for pure facts / charts
+    if intent in factual_intents:
+        return False
 
-📌 **Key Notes**
-- Data is extracted from uploaded resumes
-- Information is normalized & deduplicated
-- Response is context‑aware
+    # Very short queries → no CTA
+    if len(query.split()) <= 6:
+        return False
 
-❓ *Would you like a chart, table, or deeper analysis?*
-"""
+    return True
 
 
+# -----------------------------
+# CHAT ROUTE
+# -----------------------------
 @router.post("/chat")
 def chat(request: ChatRequest):
     query = request.query.strip()
@@ -48,66 +55,81 @@ def chat(request: ChatRequest):
 
     print("🧠 Intent:", intent)
 
-    # 1️⃣ Greeting
+    # 1️⃣ Greeting (ONLY if user greets)
     if intent == "greeting":
         return {
-            "reply": "Hi! 👋 I can search resumes, answer questions, and generate analytics 📊"
+            "reply": "Hello! I can help you analyze resumes, shortlist candidates, and generate insights."
         }
 
-    # 2️⃣ Count resumes
+    # 2️⃣ Resume count (DB only)
     if intent == "count_resumes":
         count = resume_collection.count_documents({})
         return {
-            "reply": f"📄 **Total Resumes:** {count}"
+            "reply": f"There are {count} resumes currently available in the system."
         }
 
-    # 3️⃣ List candidates
+    # 3️⃣ Candidate list (DB only)
     if intent == "list_candidates":
         names = resume_collection.distinct("name")
+        names = [n for n in names if n and len(n.strip()) > 2]
+
+        if not names:
+            return {"reply": "No candidate names are available yet."}
+
         return {
-            "reply": "👥 **Candidates:**\n" + "\n".join(f"• {n}" for n in names)
+            "reply": "\n".join(f"{i+1}. {name}" for i, name in enumerate(names))
         }
 
-    # 4️⃣ 📊 Skill chart
+    # 4️⃣ Analytics (charts only — NO LLM)
     if intent == "analytics_skill":
         return {
-            "reply": "📊 **Skill distribution across candidates:**",
+            "reply": "Skill distribution across all candidates.",
             "chart": skill_distribution()
         }
 
-    # 5️⃣ 📊 Experience chart
     if intent == "analytics_experience":
         return {
-            "reply": "📊 **Experience distribution:**",
+            "reply": "Experience distribution across candidates.",
             "chart": experience_distribution()
         }
 
-    # 6️⃣ 📍 Location chart
     if intent == "analytics_location":
         return {
-            "reply": "📍 **Candidate distribution by location:**",
+            "reply": "Candidate distribution by location.",
             "chart": location_distribution()
         }
 
-    # 7️⃣ 📈 Upload trend
     if intent == "analytics_trend":
         return {
-            "reply": "📈 **Resume upload trend over time:**",
+            "reply": "Resume upload trend over time.",
             "chart": upload_trend()
         }
 
-    # 8️⃣ 🧠 SEMANTIC Q&A (ChatGPT‑like answers)
-    resumes = list(resume_collection.find({}, {"_id": 0, "raw_text": 1}))
-    build_vector_store(resumes)
+    # 5️⃣ Semantic HR Q&A (LLM + FAISS)
+    resumes = list(
+        resume_collection.find({}, {"_id": 0, "raw_text": 1})
+    )
 
-    results = search_similar(query, k=20)
-    if not results:
+    if not resumes:
         return {
-            "reply": "❌ I couldn't find relevant resume information for that query."
+            "reply": "No resumes are available yet to answer this question."
         }
 
-    raw_answer = generate_answer("\n\n".join(results), query)
+    build_vector_store(resumes)
 
-    return {
-        "reply": chatgpt_style_reply(raw_answer)
-    }
+    matched_chunks = search_similar(query, k=20)
+
+    if not matched_chunks:
+        return {
+            "reply": "I could not find relevant information in the resumes for this query."
+        }
+
+    include_cta = should_include_cta(intent, query)
+
+    answer = generate_answer(
+        context="\n\n".join(matched_chunks),
+        question=query,
+        include_cta=include_cta
+    )
+
+    return {"reply": answer}
