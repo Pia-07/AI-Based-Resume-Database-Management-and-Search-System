@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { loginUser } from "../services/api";
+import { useGoogleLogin } from "@react-oauth/google";
+import { loginUser, loginWithGoogle } from "../services/api";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -9,6 +10,94 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Google login handler - Send token to backend for processing
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    try {
+      setError("");
+      setGoogleLoading(true);
+      
+      const token = credentialResponse.credential;
+      
+      // Send token to backend for validation and user creation
+      const response = await loginWithGoogle(token);
+      
+      console.log("Backend response:", response);
+      
+      if (response.error) {
+        setError(response.error);
+        console.error("Google login error:", response.error);
+      } else if (response.user_id) {
+        // Store user session
+        localStorage.setItem("userId", response.user_id);
+        localStorage.setItem("userEmail", response.email);
+        localStorage.setItem("userName", response.name || response.email.split('@')[0]);
+        
+        // Clear chat session to show empty state on login
+        localStorage.removeItem("chatSessionStarted");
+        
+        console.log("✅ Google login successful:", response.email);
+        navigate("/chatbot");
+      } else {
+        console.error("Invalid response structure:", response);
+        setError("Unexpected response from server. Check console for details.");
+      }
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError("Failed to process Google login. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    setError("Failed to login with Google. Please try again.");
+  };
+
+  const googleLogin = useGoogleLogin({
+  flow: "implicit",
+  onSuccess: async (tokenResponse) => {
+    try {
+      setGoogleLoading(true);
+      setError("");
+
+      // ✅ CORRECT TOKEN
+      const accessToken = tokenResponse.access_token;
+
+      const response = await loginWithGoogle(accessToken);
+
+      if (response?.error) {
+        setError(response.error);
+        return;
+      }
+
+      if (!response?.user_id) {
+        setError("Unexpected response from server");
+        return;
+      }
+
+      localStorage.setItem("userId", response.user_id);
+      localStorage.setItem("userEmail", response.email);
+      localStorage.setItem(
+        "userName",
+        response.name || response.email?.split("@")[0]
+      );
+
+      localStorage.removeItem("chatSessionStarted");
+      navigate("/chatbot");
+    } catch (err) {
+      console.error(err);
+      setError("Google login failed");
+    } finally {
+      setGoogleLoading(false);
+    }
+  },
+  onError: () => {
+    setError("Google authentication failed");
+  },
+});
+
 
   const handleLogin = async () => {
     setError("");
@@ -38,6 +127,10 @@ const Login = () => {
         // Store user session
         localStorage.setItem("userId", response.user_id || "");
         localStorage.setItem("userEmail", email);
+        
+        // Clear chat session to show empty state on next login
+        localStorage.removeItem("chatSessionStarted");
+        
         navigate("/chatbot");
       } else {
         setError("Unexpected response from server");
@@ -86,7 +179,7 @@ const Login = () => {
           <div style={styles.formHeader}>
             <h2 style={styles.formTitle}>Welcome Back</h2>
             <p style={styles.formSubtitle}>
-              Login to access your AI hiring assistant
+              Sign in to access your AI hiring assistant
             </p>
           </div>
 
@@ -163,7 +256,7 @@ const Login = () => {
                 Signing in...
               </span>
             ) : (
-              "Login"
+              "Sign In"
             )}
           </button>
 
@@ -172,10 +265,18 @@ const Login = () => {
             <span style={styles.dividerText}>or continue with</span>
           </div>
 
-          {/* Social Login */}
-          <button style={styles.socialButton}>
-            <span style={styles.socialIcon}>🔗</span>
-            Continue with SSO
+          {/* Google OAuth Login */}
+          <button
+            onClick={() => googleLogin()}
+            disabled={googleLoading || loading}
+            style={{
+              ...styles.socialButton,
+              opacity: googleLoading || loading ? 0.7 : 1,
+              cursor: googleLoading || loading ? "not-allowed" : "pointer",
+            }}
+          >
+            <span style={styles.socialIcon}>🔐</span>
+            {googleLoading ? "Signing in..." : "Continue with Google"}
           </button>
 
           {/* Sign Up Link */}

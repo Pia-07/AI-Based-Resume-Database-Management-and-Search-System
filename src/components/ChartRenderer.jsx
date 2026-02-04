@@ -33,6 +33,22 @@ const ChartRenderer = ({ data: chart }) => {
     return null;
   }
 
+  // Validate chart data
+  if (!chart.type) {
+    console.warn("⚠️ Chart type is missing");
+    return null;
+  }
+
+  if (!chart.labels || chart.labels.length === 0) {
+    console.warn("⚠️ Chart labels missing or empty");
+    return null;
+  }
+
+  if (!chart.values || chart.values.length === 0) {
+    console.warn("⚠️ Chart values missing or empty");
+    return null;
+  }
+
   console.log("📊 Chart type:", chart.type);
   console.log("📊 Chart labels:", chart.labels?.length);
   console.log("📊 Chart values:", chart.values?.length);
@@ -61,15 +77,50 @@ const ChartRenderer = ({ data: chart }) => {
       {
         label: chart.title,
         data: chart.values || [],
-        backgroundColor: colors,
-        borderColor: borderColors,
+        backgroundColor: chart.type === "pie" ? colors : colors[0],
+        borderColor: chart.type === "pie" ? borderColors : borderColors[0],
         borderWidth: 2,
+        fill: chart.type === "line",
+        tension: chart.type === "line" ? 0.4 : undefined,
+        pointRadius: chart.type === "line" ? 5 : undefined,
+        pointHoverRadius: chart.type === "line" ? 7 : undefined,
+        pointBackgroundColor: chart.type === "line" ? borderColors[0] : undefined,
+        pointBorderColor: chart.type === "line" ? "#fff" : undefined,
+        pointBorderWidth: chart.type === "line" ? 2 : undefined,
       },
     ],
   };
 
   // Chart options with better visibility
   const options = {
+    indexAxis: chart.type === "bar" ? "y" : "x",
+    scales: chart.type !== "pie" ? {
+      x: {
+        type: "category",
+        display: true,
+        ticks: {
+          font: {
+            size: 11,
+          },
+        },
+        grid: {
+          drawBorder: false,
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+      y: {
+        beginAtZero: true,
+        display: true,
+        ticks: {
+          font: {
+            size: 11,
+          },
+        },
+        grid: {
+          color: "rgba(0, 0, 0, 0.05)",
+        },
+      },
+    } : {},
     plugins: {
       legend: {
         position: "bottom",

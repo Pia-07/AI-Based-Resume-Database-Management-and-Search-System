@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 /**
  * ChatSidebar - Premium ChatGPT-like sidebar for chat history and navigation
  * Features:
+ * - Upload Resume button (top)
  * - New chat button
  * - Previous chat history with auto-generated titles
  * - Delete chat functionality
@@ -16,6 +17,7 @@ const ChatSidebar = ({
   onSelectChat,
   onDeleteChat,
   onNewChat,
+  onUploadClick,
   isCollapsed,
   onToggleCollapse,
 }) => {
@@ -23,8 +25,11 @@ const ChatSidebar = ({
 
   // Auto-save chats to localStorage
   useEffect(() => {
-    if (chats.length > 0) {
+    // Always persist chat history (store empty array when no chats)
+    try {
       localStorage.setItem("chatHistory", JSON.stringify(chats));
+    } catch (err) {
+      console.error("Failed to save chat history to localStorage:", err);
     }
   }, [chats]);
 
@@ -51,6 +56,14 @@ const ChatSidebar = ({
             ✕
           </button>
         </div>
+
+        {/* Upload Resume Button */}
+        {onUploadClick && (
+          <button style={styles.uploadResumeBtn} onClick={onUploadClick} title="Upload and analyze resumes">
+            <span style={styles.uploadIcon}>📄</span>
+            Upload Resume
+          </button>
+        )}
 
         {/* New Chat Button */}
         <button style={styles.newChatBtn} onClick={onNewChat}>
@@ -208,6 +221,26 @@ const styles = {
   newChatIcon: {
     fontSize: "18px",
     fontWeight: "bold",
+  },
+  uploadResumeBtn: {
+    margin: "12px",
+    padding: "12px 16px",
+    background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
+    color: "white",
+    border: "none",
+    borderRadius: "10px",
+    fontWeight: "600",
+    fontSize: "14px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    transition: "all 150ms ease",
+    boxShadow: "0 2px 8px rgba(245, 158, 11, 0.25)",
+  },
+  uploadIcon: {
+    fontSize: "16px",
   },
   chatList: {
     flex: 1,

@@ -1,10 +1,12 @@
 from collections import Counter
+from typing import Optional
 from ..utils.db import resume_collection
 from datetime import datetime
 
 # 🔵 PIE / BAR — SKILL DISTRIBUTION
-def skill_distribution():
-    resumes = resume_collection.find({}, {"skills": 1})
+def skill_distribution(user_id: Optional[str] = None):
+    filter_query = {"user_id": user_id} if user_id else {}
+    resumes = resume_collection.find(filter_query, {"skills": 1})
     skills = []
 
     for r in resumes:
@@ -20,12 +22,13 @@ def skill_distribution():
 
 
 # 🟢 BAR — EXPERIENCE DISTRIBUTION
-def experience_distribution():
-    resumes = resume_collection.find({}, {"experience": 1})
+def experience_distribution(user_id: Optional[str] = None):
+    filter_query = {"user_id": user_id} if user_id else {}
+    resumes = resume_collection.find(filter_query, {"experience_years": 1})
     buckets = {"0-2": 0, "3-5": 0, "6-10": 0, "10+": 0}
 
     for r in resumes:
-        exp = r.get("experience", 0)
+        exp = r.get("experience_years", 0)
         if exp <= 2:
             buckets["0-2"] += 1
         elif exp <= 5:
@@ -41,8 +44,10 @@ def experience_distribution():
         "labels": list(buckets.keys()),
         "values": list(buckets.values())
     }
-def location_distribution():
-    resumes = resume_collection.find({}, {"location": 1})
+
+def location_distribution(user_id: Optional[str] = None):
+    filter_query = {"user_id": user_id} if user_id else {}
+    resumes = resume_collection.find(filter_query, {"location": 1})
     counter = Counter(r.get("location", "Unknown") for r in resumes)
 
     return {
@@ -54,8 +59,9 @@ def location_distribution():
 
 
 # 🟣 LINE — UPLOAD TREND
-def upload_trend():
-    resumes = resume_collection.find({})
+def upload_trend(user_id: Optional[str] = None):
+    filter_query = {"user_id": user_id} if user_id else {}
+    resumes = resume_collection.find(filter_query)
     counter = Counter()
 
     for r in resumes:

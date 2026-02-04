@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { signupUser } from "../services/api";
+import { useGoogleLogin } from "@react-oauth/google";
+import { signupUser, loginWithGoogle } from "../services/api";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -11,6 +12,59 @@ const Signup = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Google login handler
+  const handleGoogleSignupSuccess = async (credentialResponse) => {
+  try {
+    setError("");
+    setGoogleLoading(true);
+    
+    console.log("Credential Response:", credentialResponse);
+    console.log("Token:", credentialResponse.credential);
+    
+    if (!credentialResponse.credential) {
+      setError("Failed to get Google token");
+      return;
+    }
+    
+      
+      const response = await loginWithGoogle(credentialResponse.credential);
+      
+      console.log("Backend response:", response);
+      console.log("Response keys:", Object.keys(response));
+      
+      if (response.error) {
+        setError(response.error);
+      } else if (response.message) {
+        // Store user session
+        localStorage.setItem("userId", response.user_id || "");
+        localStorage.setItem("userEmail", response.email || "");
+        
+        // Clear chat session to show empty state on signup
+        localStorage.removeItem("chatSessionStarted");
+        
+        navigate("/chatbot");
+      } else {
+        console.error("Unexpected response structure:", response);
+        setError(`Unexpected response from Google signup: ${JSON.stringify(response)}`);
+      }
+    } catch (err) {
+      console.error("Google signup error:", err);
+      setError("Failed to sign up with Google. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignupError = () => {
+    setError("Failed to sign up with Google. Please try again.");
+  };
+
+  const googleSignup = useGoogleLogin({
+    onSuccess: handleGoogleSignupSuccess,
+    onError: handleGoogleSignupError,
+  });
 
   // Password validation rules
   const passwordRules = {
@@ -55,6 +109,10 @@ const Signup = () => {
       } else if (response.message) {
         // Store user session
         localStorage.setItem("userEmail", email);
+        
+        // Clear chat session to show empty state on first login
+        localStorage.removeItem("chatSessionStarted");
+        
         navigate("/chatbot");
       } else {
         setError("Unexpected response from server");
@@ -236,9 +294,17 @@ const Signup = () => {
           </div>
 
           {/* Social Signup */}
-          <button style={styles.socialButton} disabled={loading}>
-            <span style={styles.socialIcon}>🔗</span>
-            Sign up with SSO
+          <button
+            onClick={() => googleSignup()}
+            disabled={loading || googleLoading}
+            style={{
+              ...styles.socialButton,
+              opacity: loading || googleLoading ? 0.7 : 1,
+              cursor: loading || googleLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            <span style={styles.socialIcon}>🔐</span>
+            {googleLoading ? "Signing up..." : "Sign up with Google"}
           </button>
 
           {/* Login Link */}

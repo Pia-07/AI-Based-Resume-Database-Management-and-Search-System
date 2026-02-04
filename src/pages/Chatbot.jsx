@@ -1,17 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ChatSidebar from "../components/ChatSidebar";
 import ChatMessage from "../components/ChatMessage";
 import ChatInputBar from "../components/ChatInputBar";
 import ChartRenderer from "../components/ChartRenderer";
+import ResumeUpload from "../components/ResumeUpload";
+import {
+  sendChatMessage,
+  getChatHistory,
+  saveChatToBackend,
+  deleteChatFromBackend
+} from "../services/api";
+
 
 /**
  * Chatbot Page - Premium ChatGPT-like interface
  * Features:
  * - Full-screen chat with sidebar navigation
- * - Chat history persistence
+ * - Chat history persistence to MongoDB backend
+ * - Conversational context (previous messages sent to LLM)
  * - Real-time streaming animations
  * - Responsive design
- * - Professional UI/UX
  */
 const Chatbot = () => {
   // State Management
@@ -21,6 +29,8 @@ const Chatbot = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Auto-scroll
   const messagesEndRef = useRef(null);
@@ -32,26 +42,78 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Load chats from localStorage on mount
+  // Load chats from backend on mount
   useEffect(() => {
-    const savedChats = localStorage.getItem("chatHistory");
-    if (savedChats) {
+    const loadChats = async () => {
+      console.log("🔄 Loading chat history from backend...");
+
       try {
-        const parsed = JSON.parse(savedChats);
-        setChats(parsed);
-        if (parsed.length > 0) {
-          setActiveChat(parsed[0].id);
-          setMessages(parsed[0].messages || []);
+        const response = await getChatHistory();
+        const backendChats = response.chats || [];
+
+        if (backendChats.length > 0) {
+          // Transform backend format to frontend format
+          const transformedChats = backendChats.map(chat => ({
+            id: chat.chat_id,
+            title: chat.title || "New Conversation",
+            messages: chat.messages || [],
+            createdAt: chat.created_at,
+            updatedAt: chat.updated_at,
+          }));
+
+          setChats(transformedChats);
+          console.log("✅ Loaded", transformedChats.length, "chats from backend");
+        } else {
+          // No backend chats, check localStorage as fallback
+          const savedChats = localStorage.getItem("chatHistory");
+          if (savedChats) {
+            try {
+              const parsed = JSON.parse(savedChats);
+              setChats(parsed);
+              console.log("📂 Loaded", parsed.length, "chats from localStorage");
+            } catch (err) {
+              console.error("Failed to load chat history from localStorage:", err);
+              setChats([]);
+            }
+          }
         }
-      } catch (err) {
-        console.error("Failed to load chat history:", err);
+      } catch (error) {
+        console.error("❌ Failed to load chats from backend:", error);
+        // Fallback to localStorage
+        const savedChats = localStorage.getItem("chatHistory");
+        if (savedChats) {
+          try {
+            setChats(JSON.parse(savedChats));
+          } catch {
+            setChats([]);
+          }
+        }
       }
+
+      setIsInitialized(true);
+    };
+
+    loadChats();
+  }, []);
+
+  // Save to backend when chat changes (debounced)
+  const saveToBackend = useCallback(async (chatId, title, msgs) => {
+    if (!chatId || msgs.length === 0) return;
+
+    try {
+      await saveChatToBackend(chatId, title, msgs);
+    } catch (error) {
+      console.error("Failed to save to backend:", error);
     }
   }, []);
 
   // Save current chat when messages change
   useEffect(() => {
-    if (activeChat && messages.length > 0) {
+    if (activeChat && messages.length > 0 && isInitialized) {
+      const currentChat = chats.find(c => c.id === activeChat);
+      const title = currentChat?.title || "New Conversation";
+
+      // Update local state
       setChats((prevChats) =>
         prevChats.map((chat) =>
           chat.id === activeChat
@@ -59,8 +121,26 @@ const Chatbot = () => {
             : chat
         )
       );
+
+      // Debounce backend save
+      const timeoutId = setTimeout(() => {
+        saveToBackend(activeChat, title, messages);
+      }, 1000);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [messages, activeChat]);
+  }, [messages, activeChat, isInitialized, saveToBackend]);
+
+  // Also save to localStorage as backup
+  useEffect(() => {
+    if (isInitialized && chats.length > 0) {
+      try {
+        localStorage.setItem("chatHistory", JSON.stringify(chats));
+      } catch (err) {
+        console.error("Failed to save to localStorage:", err);
+      }
+    }
+  }, [chats, isInitialized]);
 
   // Generate chat title from first message
   const generateChatTitle = (firstMessage) => {
@@ -94,8 +174,11 @@ const Chatbot = () => {
   };
 
   // Delete chat
-  const handleDeleteChat = (chatId) => {
+  const handleDeleteChat = async (chatId) => {
     if (window.confirm("Delete this chat? This cannot be undone.")) {
+      // Delete from backend
+      await deleteChatFromBackend(chatId);
+
       const updatedChats = chats.filter((c) => c.id !== chatId);
       setChats(updatedChats);
 
@@ -110,9 +193,24 @@ const Chatbot = () => {
     }
   };
 
-  // Send message
+  // Send message with chat history context
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
+
+    // Create new chat if none active
+    let currentChatId = activeChat;
+    if (!currentChatId) {
+      const newChat = {
+        id: Date.now().toString(),
+        title: "New Conversation",
+        messages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChat(newChat.id);
+      currentChatId = newChat.id;
+    }
 
     // Add user message
     const userMessage = {
@@ -122,14 +220,15 @@ const Chatbot = () => {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
 
     // Update chat title if first message
     if (messages.length === 0) {
       const title = generateChatTitle(input);
       setChats((prevChats) =>
         prevChats.map((chat) =>
-          chat.id === activeChat ? { ...chat, title } : chat
+          chat.id === currentChatId ? { ...chat, title } : chat
         )
       );
     }
@@ -147,47 +246,37 @@ const Chatbot = () => {
     setMessages((prev) => [...prev, loadingMessage]);
 
     try {
-      console.log("📤 Sending message:", userMessage.text);
-      
-      const res = await fetch("http://127.0.0.1:8000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMessage.text }),
-      });
+      console.log("📤 Sending message with", updatedMessages.length, "history items");
 
-      console.log("📥 Response status:", res.status, res.statusText);
-      console.log("📥 Response headers:", Object.fromEntries(res.headers));
+      // Send message with chat history for context
+      const data = await sendChatMessage(
+        userMessage.text,
+        currentChatId,
+        updatedMessages  // Pass all previous messages for context
+      );
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("❌ Backend error:", errorText);
-        throw new Error(`Backend error (${res.status}): ${errorText}`);
-      }
+      console.log("✅ Received response");
 
-      const data = await res.json();
-      console.log("✅ Received data:", data);
-      console.log("📊 Chart data:", data.chart);
+      const assistantMessage = {
+        id: loadingMessage.id,
+        sender: "assistant",
+        text: data.reply || "I couldn't generate a response.",
+        chart: data.chart || null,
+        timestamp: new Date().toISOString(),
+      };
 
-      // Replace loading message with actual response
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        {
-          id: loadingMessage.id,
-          sender: "assistant",
-          text: data.reply || "I couldn't generate a response. Please try again.",
-          chart: data.chart || null,
-          timestamp: new Date().toISOString(),
-        },
+        assistantMessage,
       ]);
     } catch (err) {
       console.error("❌ Chat error:", err);
-      // Replace loading message with error
       setMessages((prev) => [
         ...prev.slice(0, -1),
         {
           id: loadingMessage.id,
           sender: "assistant",
-          text: `❌ Error: ${err.message}`,
+          text: `❌ Error: ${err.message}. Please try again.`,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -205,6 +294,7 @@ const Chatbot = () => {
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
         onNewChat={handleNewChat}
+        onUploadClick={() => setShowUploadModal(true)}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
@@ -225,21 +315,6 @@ const Chatbot = () => {
               <p style={styles.emptyDesc}>
                 Ask me anything about your resumes, candidates, or hiring insights.
               </p>
-              <div style={styles.quickActions}>
-                {[
-                  "Show me skills distribution",
-                  "List all candidates",
-                  "Tell me about experience levels",
-                ].map((action, idx) => (
-                  <button
-                    key={idx}
-                    style={styles.quickActionBtn}
-                    onClick={() => setInput(action)}
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             <div style={styles.messagesList}>
@@ -264,6 +339,9 @@ const Chatbot = () => {
           onSend={handleSendMessage}
           isLoading={isLoading}
         />
+        {showUploadModal && (
+          <ResumeUpload isModal={true} onClose={() => setShowUploadModal(false)} />
+        )}
       </div>
     </div>
   );
@@ -320,22 +398,6 @@ const styles = {
     color: "var(--text-secondary)",
     marginBottom: "32px",
     maxWidth: "300px",
-  },
-  quickActions: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: "12px",
-  },
-  quickActionBtn: {
-    padding: "12px 16px",
-    borderRadius: "12px",
-    border: "1.5px solid #e2e8f0",
-    background: "var(--bg-primary)",
-    color: "var(--text-primary)",
-    fontSize: "13px",
-    fontWeight: "500",
-    cursor: "pointer",
-    transition: "all 150ms ease",
   },
 };
 
