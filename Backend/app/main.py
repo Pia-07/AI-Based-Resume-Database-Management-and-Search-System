@@ -4,9 +4,9 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes.auth_routes import router as auth_router
-from app.routes.resume_routes import router as resume_router
-from app.routes.chat_routes import router as chat_router
+from .routes.auth_routes import router as auth_router
+from .routes.resume_routes import router as resume_router
+from .routes.chat_routes import router as chat_router
 
 app = FastAPI()
 
