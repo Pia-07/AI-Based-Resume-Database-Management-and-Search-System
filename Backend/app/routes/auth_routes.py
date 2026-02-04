@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-import uuid, json, base64, sys
+import uuid, json, base64, sys, requests
 
 from ..utils.db import user_collection
 from ..utils.security import verify_password, hash_password
@@ -48,45 +48,104 @@ def login(data: AuthRequest):
 
 @router.post("/google")
 def google_login(data: GoogleAuthRequest):
+    """
+    Handle Google OAuth login using access token.
+    Fetches user info from Google's userinfo API endpoint.
+    """
     try:
-        token = data.token
-        payload = token.split(".")[1]
-        payload += "=" * (-len(payload) % 4)
-        user_data = json.loads(base64.urlsafe_b64decode(payload))
-
+        access_token = data.token
+        
+        # Validate token is not empty
+        if not access_token or not access_token.strip():
+            print("❌ Google login failed: Empty access token", file=sys.stderr)
+            return {"error": "Invalid access token provided"}
+        
+        print(f"🔐 Google OAuth: Received access token (length: {len(access_token)})", file=sys.stderr)
+        
+        # Call Google's userinfo API to get user data
+        # This is the correct way to use an OAuth access token
+        userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        
+        print(f"📡 Fetching user info from Google API...", file=sys.stderr)
+        
+        try:
+            response = requests.get(userinfo_url, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"❌ Google API returned status {response.status_code}: {response.text}", file=sys.stderr)
+                return {"error": f"Failed to fetch user info from Google (status: {response.status_code})"}
+            
+            user_data = response.json()
+            print(f"✅ Successfully fetched user data from Google", file=sys.stderr)
+            
+        except requests.exceptions.Timeout:
+            print("❌ Google API request timed out", file=sys.stderr)
+            return {"error": "Google authentication timed out. Please try again."}
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Failed to connect to Google API: {e}", file=sys.stderr)
+            return {"error": "Failed to connect to Google. Please check your internet connection."}
+        
+        # Extract user information
         email = user_data.get("email")
-        name = user_data.get("name") or email.split("@")[0]
-        google_id = user_data.get("sub")
-
-        if not email or not google_id:
-            return {"error": "Invalid Google token"}
-
-        existing = user_collection.find_one({"email": email})
-        if existing:
-            return {
-                "message": "Login successful",
-                "user_id": existing["user_id"],
+        name = user_data.get("name")
+        google_id = user_data.get("id")  # Note: Google API uses "id" not "sub"
+        
+        # Validate required fields
+        if not email:
+            print(f"❌ No email in Google response: {user_data}", file=sys.stderr)
+            return {"error": "Could not retrieve email from Google account"}
+        
+        if not google_id:
+            print(f"❌ No user ID in Google response: {user_data}", file=sys.stderr)
+            return {"error": "Could not retrieve user ID from Google account"}
+        
+        # Use email username as fallback for name
+        if not name:
+            name = email.split("@")[0]
+        
+        print(f"👤 Processing Google login for: {email}", file=sys.stderr)
+        
+        # Check if user already exists
+        try:
+            existing = user_collection.find_one({"email": email})
+            
+            if existing:
+                print(f"✅ User found in database: {email}", file=sys.stderr)
+                return {
+                    "message": "Login successful",
+                    "user_id": existing["user_id"],
+                    "email": email,
+                    "name": existing.get("name", name),
+                }
+            
+            # Create new user
+            print(f"📝 Creating new user for: {email}", file=sys.stderr)
+            user = {
+                "user_id": str(uuid.uuid4()),
                 "email": email,
-                "name": existing.get("name", name),
+                "name": name,
+                "google_id": google_id,
+                "role": "HR",
+                "login_method": "google",
             }
-
-        user = {
-            "user_id": str(uuid.uuid4()),
-            "email": email,
-            "name": name,
-            "google_id": google_id,
-            "role": "HR",
-            "login_method": "google",
-        }
-        user_collection.insert_one(user)
-
-        return {
-            "message": "Signup successful",
-            "user_id": user["user_id"],
-            "email": email,
-            "name": name,
-        }
+            user_collection.insert_one(user)
+            
+            print(f"✅ New user created successfully: {email}", file=sys.stderr)
+            
+            return {
+                "message": "Signup successful",
+                "user_id": user["user_id"],
+                "email": email,
+                "name": name,
+            }
+            
+        except Exception as db_error:
+            print(f"❌ Database error during Google login: {db_error}", file=sys.stderr)
+            return {"error": "Database error. Please try again later."}
 
     except Exception as e:
-        print("Google login error:", e, file=sys.stderr)
-        return {"error": "Google login failed"}
+        print(f"❌ Unexpected error in Google login: {type(e).__name__}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Authentication failed: {str(e)}"}
