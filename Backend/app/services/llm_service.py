@@ -1,11 +1,19 @@
 import os
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
-from google import genai
 
-load_dotenv()
-
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Try to import the Google Generative AI client. If it's not available, fall back
+# gracefully so the backend doesn't crash at import time. This helps during local
+# development when the package or API key may not be installed/configured.
+try:
+    from google import genai
+    load_dotenv()
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+except ModuleNotFoundError:
+    genai = None
+    client = None
+    load_dotenv()
+    print("⚠️ 'google-generative-ai' package not installed. Install with 'pip install google-generative-ai' and set GEMINI_API_KEY in your .env. LLM features will be disabled.")
 
 
 def generate_answer(
@@ -102,6 +110,11 @@ IMPORTANT REMINDERS:
 - If context is empty or irrelevant, clearly state the information is not available
 - Match your response length to the question complexity
 """
+
+    # If the client is not available, return an informative message instead of crashing
+    if client is None:
+        print("❌ Gemini client not available. Ensure 'google-generative-ai' is installed and GEMINI_API_KEY is set.")
+        return "LLM service unavailable: please install 'google-generative-ai' and set GEMINI_API_KEY in your environment."
 
     try:
         response = client.models.generate_content(

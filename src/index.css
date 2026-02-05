@@ -15,27 +15,31 @@
   --primary-light: #818cf8;
   --primary-lighter: #e0e7ff;
   
-  /* Neutrals */
+  /* Light Mode Defaults */
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
   --bg-hover: #f0f4f8;
   
-  /* Dark Mode */
-  --dark-bg-primary: #0f172a;
-  --dark-bg-secondary: #1e293b;
-  --dark-bg-tertiary: #334155;
-  
-  /* Text Colors */
+  /* Text Colors - Light Mode */
   --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --text-light: #cbd5e1;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-light: #94a3b8;
   
   /* Status Colors */
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
+  
+  /* Borders */
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
+  
+  /* Chart colors for dark mode */
+  --chart-bg: #ffffff;
+  --chart-text: #1e293b;
+  --chart-grid: rgba(0, 0, 0, 0.05);
   
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
@@ -57,24 +61,129 @@
   --rounded-full: 9999px;
 }
 
+/* ============================================
+   DARK MODE SUPPORT - Manual Toggle
+   ============================================ */
+
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #475569;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-light: #64748b;
+  
+  --border-color: #475569;
+  --border-hover: #64748b;
+  
+  --chart-bg: #1e293b;
+  --chart-text: #e2e8f0;
+  --chart-grid: rgba(255, 255, 255, 0.1);
+}
+
+/* Also support prefers-color-scheme for system-level dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-hover: #475569;
+    
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --text-light: #64748b;
+    
+    --border-color: #475569;
+    --border-hover: #64748b;
+    
+    --chart-bg: #1e293b;
+    --chart-text: #e2e8f0;
+    --chart-grid: rgba(255, 255, 255, 0.1);
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-secondary);
   color: var(--text-primary);
-  transition: background-color var(--transition-base);
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
 code, pre {
   font-family: 'Fira Code', 'Monaco', 'Courier New', monospace;
+}
+
+/* ============================================
+   THEME TOGGLE SWITCH
+   ============================================ */
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--rounded-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-color);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.theme-toggle-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--text-tertiary);
+  border-radius: var(--rounded-full);
+  transition: background var(--transition-fast);
+}
+
+.theme-toggle-track.active {
+  background: var(--primary);
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle-track.active .theme-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.theme-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.theme-toggle-icon {
+  font-size: 16px;
 }
 
 /* ============================================
@@ -141,20 +250,20 @@ button.ghost:hover {
   padding: 16px;
   border-radius: var(--rounded-lg);
   box-shadow: var(--shadow-sm);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   transition: all var(--transition-base);
 }
 
 .card:hover {
   box-shadow: var(--shadow-md);
-  border-color: #cbd5e1;
+  border-color: var(--border-hover);
 }
 
 .card-elevated {
   background: var(--bg-primary);
   border-radius: var(--rounded-xl);
   box-shadow: var(--shadow-lg);
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--border-color);
 }
 
 /* ============================================
@@ -165,12 +274,13 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
+input[type="search"],
 textarea,
 select {
   width: 100%;
   padding: 12px 16px;
   border-radius: var(--rounded-lg);
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--border-color);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
@@ -189,7 +299,7 @@ select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-  background-color: rgba(99, 102, 241, 0.02);
+  background-color: var(--bg-primary);
 }
 
 input:disabled,
@@ -215,29 +325,12 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-h1 {
-  font-size: 32px;
-}
-
-h2 {
-  font-size: 28px;
-}
-
-h3 {
-  font-size: 24px;
-}
-
-h4 {
-  font-size: 20px;
-}
-
-h5 {
-  font-size: 16px;
-}
-
-h6 {
-  font-size: 14px;
-}
+h1 { font-size: 32px; }
+h2 { font-size: 28px; }
+h3 { font-size: 24px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 { font-size: 14px; }
 
 p {
   font-size: 14px;
@@ -254,6 +347,41 @@ a {
 a:hover {
   color: var(--primary-dark);
   text-decoration: underline;
+}
+
+/* Strong text visibility fix */
+strong, b {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ============================================
+   CHAT MESSAGE VISIBILITY FIXES
+   ============================================ */
+
+.chat-message-assistant {
+  color: var(--text-primary) !important;
+}
+
+.chat-message-assistant p,
+.chat-message-assistant li,
+.chat-message-assistant span {
+  color: var(--text-primary) !important;
+}
+
+.chat-message-user {
+  color: #ffffff !important;
+}
+
+/* ============================================
+   CHART CONTAINER STYLES
+   ============================================ */
+
+.chart-container {
+  background: var(--chart-bg);
+  border-radius: var(--rounded-lg);
+  padding: 20px;
+  border: 1px solid var(--border-color);
 }
 
 /* ============================================
@@ -295,6 +423,15 @@ a:hover {
 
 .opacity-50 { opacity: 0.5; }
 .opacity-75 { opacity: 0.75; }
+
+/* Visible text utility classes */
+.text-visible {
+  color: var(--text-primary) !important;
+}
+
+.text-muted {
+  color: var(--text-secondary) !important;
+}
 
 /* ============================================
    ANIMATIONS
@@ -389,78 +526,14 @@ a:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--text-light);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* ============================================
-   DARK MODE SUPPORT
-   ============================================ */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Mode Colors */
-    --bg-primary: #1a202c;
-    --bg-secondary: #0f172a;
-    --bg-tertiary: #1e293b;
-    --bg-hover: #334155;
-    
-    /* Dark Text */
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-tertiary: #94a3b8;
-    --text-light: #64748b;
-  }
-
-  body {
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-  }
-
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  textarea,
-  select {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-    border-color: #475569;
-  }
-
-  input:focus,
-  textarea:focus,
-  select:focus {
-    background-color: rgba(99, 102, 241, 0.1);
-    border-color: var(--primary-light);
-  }
-
-  .card {
-    background: var(--bg-primary);
-    border-color: #475569;
-  }
-
-  .card:hover {
-    border-color: #64748b;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #475569;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
-  }
+  background: var(--text-tertiary);
 }

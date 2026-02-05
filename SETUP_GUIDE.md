@@ -70,6 +70,30 @@ After login, you'll be redirected to `/chatbot` where you can:
 3. Check frontend is calling correct URL: `http://127.0.0.1:8000`
 4. Check browser console (F12) for detailed error messages
 
+### **Issue: "LLM/Gemini not available"**
+
+**Symptoms**: Server raises `ModuleNotFoundError: No module named 'google.generativeai'` or chat endpoints return "LLM service unavailable" messages.
+
+**Solution**:
+- Install the Gemini client in the backend virtual environment:
+  ```bash
+  # Activate your venv, then
+  pip install google-generative-ai
+  ```
+- Add `google-generative-ai` to `Backend/requirements.txt` (already added) and/or the top-level `requirements.txt`, then run:
+  ```bash
+  pip install -r Backend/requirements.txt
+  # or
+  pip install -r requirements.txt
+  ```
+- Create or update a `.env` in `Backend/` with your key:
+  ```ini
+  GEMINI_API_KEY=your_api_key_here
+  ```
+- Restart the backend server after installing and setting the env var.
+
+If you still see errors, check the server logs for messages like "⚠️ 'google-generative-ai' package not installed" or "❌ Gemini API error" which indicate missing package or invalid API key.
+
 ### **Issue: "Invalid Credentials"**
 
 **Solutions**:

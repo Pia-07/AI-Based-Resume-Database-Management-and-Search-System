@@ -355,7 +355,10 @@ const styles = {
     cursor: "pointer",
     zIndex: 101,
     boxShadow: "0 2px 8px rgba(99, 102, 241, 0.2)",
-    display: "none",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s ease",
   },
 
   // Media queries will be handled inline or in index.css

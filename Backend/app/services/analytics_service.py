@@ -1,79 +1,239 @@
+"""
+Analytics Service
+Provides data analytics for resume insights including skill distribution,
+experience levels, location distribution, and upload trends.
+Fetches ALL resumes from MongoDB (no user-based filtering for analytics).
+"""
 from collections import Counter
 from typing import Optional
 from ..utils.db import resume_collection
 from datetime import datetime
 
+
+def _get_all_resumes_filter(user_id: Optional[str] = None):
+    """
+    Returns a filter query that includes ALL resumes.
+    For analytics, we want to show data from ALL uploaded resumes,
+    not just those belonging to the current user.
+    
+    If user_id is provided and you want user-specific analytics,
+    set include_all=False. Otherwise, returns {} to get ALL resumes.
+    """
+    # For analytics, always return ALL resumes regardless of user_id
+    # This ensures HR can see complete analytics of all candidates
+    return {}
+
+
 # 🔵 PIE / BAR — SKILL DISTRIBUTION
-def skill_distribution(user_id: Optional[str] = None):
-    filter_query = {"user_id": user_id} if user_id else {}
-    resumes = resume_collection.find(filter_query, {"skills": 1})
+def skill_distribution(user_id: Optional[str] = None, chart_type: str = "pie"):
+    """
+    Get skill distribution across ALL resumes in the database.
+    Returns pie chart data by default, can be changed to bar.
+    """
+    # Get ALL resumes, not filtered by user
+    resumes = resume_collection.find({}, {"skills": 1})
     skills = []
 
     for r in resumes:
         skills.extend(r.get("skills", []))
 
+    if not skills:
+        # Return sample data if no skills found
+        return {
+            "type": chart_type,
+            "title": "Skill Distribution",
+            "labels": ["No data available"],
+            "values": [1]
+        }
+
     counter = Counter(skills)
+    
+    # Sort by frequency and get top 15 skills for better visualization
+    top_skills = counter.most_common(15)
+    
     return {
-        "type": "pie",
+        "type": chart_type,
         "title": "Skill Distribution",
-        "labels": list(counter.keys()),
-        "values": list(counter.values())
+        "labels": [skill for skill, count in top_skills],
+        "values": [count for skill, count in top_skills]
     }
 
 
 # 🟢 BAR — EXPERIENCE DISTRIBUTION
-def experience_distribution(user_id: Optional[str] = None):
-    filter_query = {"user_id": user_id} if user_id else {}
-    resumes = resume_collection.find(filter_query, {"experience_years": 1})
-    buckets = {"0-2": 0, "3-5": 0, "6-10": 0, "10+": 0}
+def experience_distribution(user_id: Optional[str] = None, chart_type: str = "bar"):
+    """
+    Get experience level distribution across ALL resumes.
+    """
+    resumes = resume_collection.find({}, {"experience_years": 1})
+    buckets = {"0-2 years": 0, "3-5 years": 0, "6-10 years": 0, "10+ years": 0}
 
+    count = 0
     for r in resumes:
-        exp = r.get("experience_years", 0)
+        count += 1
+        exp = r.get("experience_years", 0) or 0
         if exp <= 2:
-            buckets["0-2"] += 1
+            buckets["0-2 years"] += 1
         elif exp <= 5:
-            buckets["3-5"] += 1
+            buckets["3-5 years"] += 1
         elif exp <= 10:
-            buckets["6-10"] += 1
+            buckets["6-10 years"] += 1
         else:
-            buckets["10+"] += 1
+            buckets["10+ years"] += 1
+
+    print(f"📊 Experience distribution: processed {count} resumes")
 
     return {
-        "type": "bar",
+        "type": chart_type,
         "title": "Experience Distribution",
         "labels": list(buckets.keys()),
         "values": list(buckets.values())
     }
 
-def location_distribution(user_id: Optional[str] = None):
-    filter_query = {"user_id": user_id} if user_id else {}
-    resumes = resume_collection.find(filter_query, {"location": 1})
-    counter = Counter(r.get("location", "Unknown") for r in resumes)
 
+# 🔴 BAR/PIE — LOCATION DISTRIBUTION
+def location_distribution(user_id: Optional[str] = None, chart_type: str = "bar"):
+    """
+    Get geographic distribution of ALL candidates.
+    Cleans up 'Unknown' values and extracts location from raw_text if needed.
+    """
+    resumes = list(resume_collection.find({}, {"location": 1, "raw_text": 1}))
+    
+    locations = []
+    for r in resumes:
+        loc = r.get("location", "")
+        
+        # Clean up location value
+        if loc and loc.strip() and loc.lower() not in ["unknown", "null", "none", ""]:
+            # Normalize location (capitalize first letter)
+            loc = loc.strip().title()
+            locations.append(loc)
+        else:
+            # Try to extract location from raw_text (look for common patterns)
+            raw_text = r.get("raw_text", "") or ""
+            extracted_loc = _extract_location_from_text(raw_text)
+            if extracted_loc:
+                locations.append(extracted_loc)
+            else:
+                locations.append("Not Specified")
+    
+    if not locations:
+        return {
+            "type": chart_type,
+            "title": "Location Distribution",
+            "labels": ["No data"],
+            "values": [1]
+        }
+    
+    counter = Counter(locations)
+    
+    # Get top 10 locations for better visualization
+    top_locations = counter.most_common(10)
+    
+    print(f"📍 Location distribution: {len(top_locations)} unique locations from {len(resumes)} resumes")
+    
     return {
-        "type": "bar",
+        "type": chart_type,
         "title": "Location Distribution",
-        "labels": list(counter.keys()),
-        "values": list(counter.values())
+        "labels": [loc for loc, count in top_locations],
+        "values": [count for loc, count in top_locations]
     }
 
 
+def _extract_location_from_text(text: str) -> Optional[str]:
+    """Try to extract location from resume text."""
+    if not text:
+        return None
+    
+    # Common Indian cities and locations
+    cities = [
+        "Mumbai", "Delhi", "Bangalore", "Bengaluru", "Chennai", "Hyderabad",
+        "Kolkata", "Pune", "Ahmedabad", "Jaipur", "Surat", "Lucknow",
+        "Kanpur", "Nagpur", "Indore", "Thane", "Bhopal", "Visakhapatnam",
+        "Patna", "Vadodara", "Gujarat", "Maharashtra", "Karnataka",
+        "Tamil Nadu", "Telangana", "West Bengal", "Rajasthan", "Uttar Pradesh",
+        "New York", "San Francisco", "London", "Singapore", "Dubai"
+    ]
+    
+    text_lower = text.lower()
+    for city in cities:
+        if city.lower() in text_lower:
+            return city
+    
+    return None
+
+
 # 🟣 LINE — UPLOAD TREND
-def upload_trend(user_id: Optional[str] = None):
-    filter_query = {"user_id": user_id} if user_id else {}
-    resumes = resume_collection.find(filter_query)
+def upload_trend(user_id: Optional[str] = None, chart_type: str = "line"):
+    """
+    Get resume upload trends over time (ALL resumes).
+    Groups by month to show upload patterns.
+    """
+    resumes = list(resume_collection.find({}, {"_id": 1, "uploaded_at": 1}))
     counter = Counter()
 
     for r in resumes:
-        ts = r["_id"].generation_time  # Mongo auto timestamp
-        month = ts.strftime("%Y-%m")
-        counter[month] += 1
+        try:
+            # Try to get timestamp from uploaded_at field first
+            uploaded_at = r.get("uploaded_at")
+            if uploaded_at:
+                if isinstance(uploaded_at, str):
+                    # Parse ISO format date
+                    ts = datetime.fromisoformat(uploaded_at.replace('Z', '+00:00'))
+                elif isinstance(uploaded_at, datetime):
+                    ts = uploaded_at
+                else:
+                    ts = r["_id"].generation_time
+            else:
+                # Fallback to MongoDB ObjectId timestamp
+                ts = r["_id"].generation_time
+            
+            month = ts.strftime("%Y-%m")
+            counter[month] += 1
+        except Exception as e:
+            print(f"⚠️ Error processing resume timestamp: {e}")
+            continue
+
+    if not counter:
+        # Return sample data if no data
+        return {
+            "type": chart_type,
+            "title": "Resume Upload Trend",
+            "labels": ["No data"],
+            "values": [0]
+        }
 
     months = sorted(counter.keys())
+    
+    print(f"📈 Upload trend: {len(months)} months, total {sum(counter.values())} resumes")
 
     return {
-        "type": "line",
+        "type": chart_type,
         "title": "Resume Upload Trend",
         "labels": months,
         "values": [counter[m] for m in months],
     }
+
+
+# 🌐 DYNAMIC CHART GENERATOR
+def generate_chart(chart_type: str, data_type: str, user_id: Optional[str] = None):
+    """
+    Generate any chart type for any data type.
+    
+    Args:
+        chart_type: 'pie', 'bar', or 'line'
+        data_type: 'skill', 'experience', 'location', or 'trend'
+        user_id: Optional user ID (not used for analytics)
+    
+    Returns:
+        Chart data dictionary
+    """
+    if data_type == "skill":
+        return skill_distribution(user_id, chart_type)
+    elif data_type == "experience":
+        return experience_distribution(user_id, chart_type)
+    elif data_type == "location":
+        return location_distribution(user_id, chart_type)
+    elif data_type == "trend":
+        return upload_trend(user_id, chart_type)
+    else:
+        return skill_distribution(user_id, chart_type)

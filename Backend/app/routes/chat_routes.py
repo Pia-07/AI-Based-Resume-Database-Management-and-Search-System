@@ -1,18 +1,21 @@
+"""
+Chat Routes
+Chatbot API endpoints for resume-based Q&A and analytics.
+Uses MongoDB for all data - NO STATIC RESPONSES, NO AWS S3.
+"""
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime
-import uuid
+import json
 
-from ..services.intent_service import detect_intent
+from ..services.intent_service import detect_intent, detect_chart_type
 from ..services.analytics_service import (
-    location_distribution,
-    skill_distribution,
-    experience_distribution,
-    upload_trend,
+    generate_chart,
 )
 from ..services.embedding_service import build_vector_store, search_similar
 from ..services.llm_service import generate_answer
+from ..services.resume_service import get_resume_content_for_context
 from ..utils.db import resume_collection, chat_collection
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -21,13 +24,6 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # -----------------------------
 # Request/Response Models
 # -----------------------------
-class ChatMessage(BaseModel):
-    id: str
-    sender: str  # "user" or "assistant"
-    text: str
-    timestamp: str
-
-
 class ChatRequest(BaseModel):
     query: str
     user_id: Optional[str] = None
@@ -43,22 +39,32 @@ class SaveChatRequest(BaseModel):
 
 
 # -----------------------------
-# Helper: Determine CTA inclusion
+# Helper: Build resume context
 # -----------------------------
-def should_include_cta(intent: str, query: str) -> bool:
-    factual_intents = {
-        "count_resumes",
-        "analytics_location",
-        "analytics_skill",
-        "analytics_experience",
-        "analytics_trend",
-        "list_candidates",
-    }
-    if intent in factual_intents:
-        return False
-    if len(query.split()) <= 6:
-        return False
-    return True
+def build_resume_context(resumes: List[dict]) -> List[str]:
+    contexts = []
+    for resume in resumes:
+        context = get_resume_content_for_context(resume)
+        if context and len(context.strip()) > 10:
+            contexts.append(context)
+    return contexts
+
+
+def format_chart_data_for_llm(chart_data: dict) -> str:
+    """Format chart data as text so LLM can explain it."""
+    if not chart_data or not chart_data.get("labels"):
+        return "No analytics data available."
+    
+    text = f"Analytics Data for {chart_data.get('title', 'Requested Metric')}:\n"
+    labels = chart_data.get("labels", [])
+    values = chart_data.get("values", [])
+    
+    # Limit to top 10 for context window
+    for i, (label, value) in enumerate(zip(labels, values)):
+        if i >= 15: break
+        text += f"- {label}: {value}\n"
+        
+    return text
 
 
 # -----------------------------
@@ -67,243 +73,131 @@ def should_include_cta(intent: str, query: str) -> bool:
 @router.post("")
 def chat(request: ChatRequest):
     query = request.query.strip()
-    user_id = request.user_id
-    chat_id = request.chat_id
+    user_id = request.user_id # Note: Analytics ignores this to show global stats
     chat_history = request.chat_history or []
     
-    # Log incoming request for debugging
-    print(f"📩 Chat Request: query='{query}', user_id={user_id}, chat_id={chat_id}")
-    print(f"📜 Chat History: {len(chat_history)} previous messages")
+    print(f"📩 Chat Query: '{query}'")
     
     intent = detect_intent(query)
-    print(f"🧠 Detected Intent: {intent}")
+    chart_preference = detect_chart_type(query)
+    
+    print(f"🧠 Intent: {intent}, Chart Pref: {chart_preference}")
 
-    # 1️⃣ Greeting
-    if intent == "greeting":
-        return {
-            "reply": "Hello! I'm your resume analyst assistant. I can help you explore candidate profiles, find specific skills, and answer questions about the uploaded resumes. What would you like to know?",
-            "chart": None,
-        }
+    # Prepare response data holders
+    chart_data = None
+    context_text = ""
+    include_cta = True
 
-    # 2️⃣ Resume count
-    if intent == "count_resumes":
-        # Filter by user if user_id provided
-        filter_query = {"user_id": user_id} if user_id else {}
-        count = resume_collection.count_documents(filter_query)
-        return {
-            "reply": f"**Answer:**\nThere are **{count}** resumes currently available in the system.",
-            "chart": None,
-        }
+    # 1️⃣ ANALYTICS & FACTS INTENTS
+    if intent.startswith("analytics_"):
+        data_type = intent.replace("analytics_", "")
+        # Generate chart
+        chart_data = generate_chart(chart_preference, data_type, user_id)
+        # Create text context from the chart data
+        context_text = format_chart_data_for_llm(chart_data)
+        include_cta = False
 
-    # 3️⃣ Candidate list
-    if intent == "list_candidates":
-        filter_query = {"user_id": user_id} if user_id else {}
-        names = list(resume_collection.find(filter_query, {"name": 1, "_id": 0}))
-        names = [n.get("name") for n in names if n.get("name") and len(n.get("name", "").strip()) > 2]
-
-        if not names:
-            return {
-                "reply": "**Answer:**\nNo candidate names are available yet. Please upload some resumes first.",
-                "chart": None,
-            }
-
-        formatted_names = "\n".join(f"{i+1}. {name}" for i, name in enumerate(names))
-        return {
-            "reply": f"**Context:**\nListing all candidates from uploaded resumes.\n\n**Answer:**\n{formatted_names}\n\n**Key Points:**\n- Total candidates: {len(names)}",
-            "chart": None,
-        }
-
-    # 4️⃣ Analytics
-    if intent == "analytics_skill":
-        return {
-            "reply": "**Context:**\nAnalyzing skill distribution across all uploaded resumes.\n\n**Answer:**\nHere's the skill distribution chart based on the resume data.",
-            "chart": skill_distribution(user_id),
-        }
-
-    if intent == "analytics_experience":
-        return {
-            "reply": "**Context:**\nAnalyzing experience levels across all candidates.\n\n**Answer:**\nHere's the experience distribution chart.",
-            "chart": experience_distribution(user_id),
-        }
-
-    if intent == "analytics_location":
-        return {
-            "reply": "**Context:**\nAnalyzing geographic distribution of candidates.\n\n**Answer:**\nHere's the location distribution chart.",
-            "chart": location_distribution(user_id),
-        }
-
-    if intent == "analytics_trend":
-        return {
-            "reply": "**Context:**\nAnalyzing resume upload patterns over time.\n\n**Answer:**\nHere's the upload trend chart.",
-            "chart": upload_trend(user_id),
-        }
-
-    # 5️⃣ Semantic Q&A - Resume-based answering
-    try:
-        # Get resumes (filter by user if provided)
-        filter_query = {"user_id": user_id} if user_id else {}
-        resumes = list(resume_collection.find(filter_query, {"_id": 0, "raw_text": 1}))
-
-        print(f"📄 Found {len(resumes)} resumes for context")
-
-        if not resumes:
-            return {
-                "reply": "**Answer:**\nNo resumes are available yet to answer this question. Please upload some resumes first using the Upload Resume button.",
-                "chart": None,
-            }
-
-        # Build vector store with available resumes
-        build_vector_store(resumes)
-
-        # Search for relevant chunks
-        matched_chunks = search_similar(query, k=15)
-        print(f"🔍 Found {len(matched_chunks)} relevant chunks")
-
-        if not matched_chunks:
-            return {
-                "reply": "**Answer:**\nI could not find relevant information in the uploaded resumes to answer your question. The specific details you're asking about may not be present in the current resume data.",
-                "chart": None,
-            }
-
-        # Generate answer with chat history for context
-        context = "\n\n---\n\n".join(matched_chunks)
-        include_cta = should_include_cta(intent, query)
+    elif intent == "count_resumes":
+        count = resume_collection.count_documents({})
+        context_text = f"FACT: There are exactly {count} total resumes/candidates in the database."
+        include_cta = False
         
-        answer = generate_answer(
-            context=context,
+    elif intent == "list_candidates":
+        names = list(resume_collection.find({}, {"name": 1, "_id": 0}))
+        name_list = [n.get("name") for n in names if n.get("name")]
+        if len(name_list) > 50:
+             name_list = name_list[:50] # Limit for LLM context
+             context_text = f"List of Candidates (first 50): {', '.join(name_list)}..."
+        else:
+             context_text = f"List of All Candidates: {', '.join(name_list)}"
+        include_cta = False
+
+    elif intent == "greeting":
+        context_text = "The user is greeting you. Introduce yourself as the AI Resume Assistant."
+        include_cta = True
+
+    else:
+        # 2️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)
+        # Fetch ALL resumes
+        resumes = list(resume_collection.find({}, {
+            "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
+            "skills": 1, "experience_years": 1, "location": 1,
+            "education": 1, "experience": 1, "summary": 1, "certifications": 1
+        }))
+        
+        if not resumes:
+            context_text = "SYSTEM NOTE: No resumes are uploaded in the database yet."
+        else:
+            resume_contexts = build_resume_context(resumes)
+            if resume_contexts:
+                # Build vector store
+                vector_input = [{"raw_text": ctx} for ctx in resume_contexts]
+                build_vector_store(vector_input)
+                
+                # Search
+                matched_chunks = search_similar(query, k=10)
+                if not matched_chunks:
+                    matched_chunks = resume_contexts[:5] # Fallback
+                
+                context_text = "\n\n---\n\n".join(matched_chunks)
+            else:
+                context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
+
+    # 3️⃣ GENERATE ANSWER
+    # We pass the constructed context (whether analytics stats or resume chunks) to the LLM
+    try:
+        reply = generate_answer(
+            context=context_text,
             question=query,
             chat_history=chat_history,
             include_cta=include_cta
         )
-        
-        print(f"✅ Generated answer: {len(answer)} characters")
-
-        return {
-            "reply": answer,
-            "chart": None,
-        }
-
     except Exception as e:
-        print(f"❌ Chat processing error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "reply": "**Answer:**\nI encountered an error while processing your request. Please try rephrasing your question or try again later.",
-            "chart": None,
-        }
+        print(f"❌ LLM Error: {e}")
+        reply = "I apologize, but I encountered an error generating the response."
+
+    return {
+        "reply": reply,
+        "chart": chart_data
+    }
 
 
 # -----------------------------
-# CHAT HISTORY ENDPOINTS
+# HISTORY MANAGEMENT
 # -----------------------------
 
 @router.get("/history/{user_id}")
 def get_chat_history(user_id: str):
-    """Get all chats for a user"""
     try:
-        print(f"🔄 Request to fetch chat history for user_id: '{user_id}'")
-        
-        chats = list(chat_collection.find(
-            {"user_id": user_id},
-            {"_id": 0}
-        ).sort("updated_at", -1))
-        
-        # Debug: check total chats in DB
-        total_chats = chat_collection.count_documents({})
-        
-        print(f"📂 Retrieved {len(chats)} chats for user '{user_id}'. Total chats in DB: {total_chats}")
-        
-        if len(chats) == 0 and total_chats > 0:
-            print(f"⚠️ User '{user_id}' has 0 chats, but there are {total_chats} chats in total in the DB.")
-            # Optional: log a sample chat's user_id if any exist
-            sample = chat_collection.find_one({}, {"user_id": 1})
-            if sample:
-                print(f"ℹ️ Sample chat in DB has user_id: '{sample.get('user_id')}'")
-
+        chats = list(chat_collection.find({"user_id": user_id}, {"_id": 0}).sort("updated_at", -1))
         return {"chats": chats}
     except Exception as e:
-        print(f"❌ Error fetching chat history: {e}")
         return {"chats": [], "error": str(e)}
-
 
 @router.post("/save")
 def save_chat(request: SaveChatRequest):
-    """Save or update a chat session"""
     try:
         now = datetime.utcnow().isoformat()
-        
-        # Check if chat exists
-        existing = chat_collection.find_one({
-            "user_id": request.user_id,
-            "chat_id": request.chat_id
-        })
-        
-        if existing:
-            # Update existing chat
-            chat_collection.update_one(
-                {"user_id": request.user_id, "chat_id": request.chat_id},
-                {
-                    "$set": {
-                        "title": request.title,
-                        "messages": request.messages,
-                        "updated_at": now
-                    }
-                }
-            )
-            print(f"✅ Updated chat {request.chat_id} for user {request.user_id}")
-        else:
-            # Create new chat
-            chat_doc = {
-                "user_id": request.user_id,
-                "chat_id": request.chat_id,
-                "title": request.title,
-                "messages": request.messages,
-                "created_at": now,
-                "updated_at": now
-            }
-            chat_collection.insert_one(chat_doc)
-            print(f"✅ Created new chat {request.chat_id} for user {request.user_id}")
-        
+        chat_collection.update_one(
+            {"user_id": request.user_id, "chat_id": request.chat_id},
+            {
+                "$set": {
+                    "title": request.title,
+                    "messages": request.messages,
+                    "updated_at": now
+                },
+                "$setOnInsert": {"created_at": now}
+            },
+            upsert=True
+        )
         return {"success": True, "chat_id": request.chat_id}
     except Exception as e:
-        print(f"❌ Error saving chat: {e}")
         return {"success": False, "error": str(e)}
-
 
 @router.delete("/{chat_id}")
-def delete_chat(chat_id: str, user_id: str = None):
-    """Delete a chat by ID"""
+def delete_chat(chat_id: str):
     try:
-        filter_query = {"chat_id": chat_id}
-        if user_id:
-            filter_query["user_id"] = user_id
-            
-        result = chat_collection.delete_one(filter_query)
-        
-        if result.deleted_count > 0:
-            print(f"🗑️ Deleted chat {chat_id}")
-            return {"success": True, "deleted": True}
-        else:
-            return {"success": False, "deleted": False, "message": "Chat not found"}
+        chat_collection.delete_one({"chat_id": chat_id})
+        return {"success": True}
     except Exception as e:
-        print(f"❌ Error deleting chat: {e}")
-        return {"success": False, "error": str(e)}
-
-
-@router.get("/single/{chat_id}")
-def get_single_chat(chat_id: str, user_id: str = None):
-    """Get a single chat by ID"""
-    try:
-        filter_query = {"chat_id": chat_id}
-        if user_id:
-            filter_query["user_id"] = user_id
-            
-        chat = chat_collection.find_one(filter_query, {"_id": 0})
-        
-        if chat:
-            return {"success": True, "chat": chat}
-        else:
-            return {"success": False, "chat": None, "message": "Chat not found"}
-    except Exception as e:
-        print(f"❌ Error fetching chat: {e}")
         return {"success": False, "error": str(e)}

@@ -1,10 +1,8 @@
 from sentence_transformers import SentenceTransformer, util
+import re
 
 # Load once
-intent_model = SentenceTransformer(
-    "all-MiniLM-L6-v2",
-    cache_folder="./models"
-)
+intent_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Intent examples (THIS IS THE NLU BRAIN)
 INTENT_EXAMPLES = {
@@ -14,43 +12,45 @@ INTENT_EXAMPLES = {
     "count_resumes": [
         "how many resumes do you have",
         "number of resumes",
-        "total candidates"
+        "total candidates",
+        "count candidates"
     ],
     "list_candidates": [
         "list all candidates",
         "show candidate names",
-        "who are the candidates"
+        "who are the candidates",
+        "names of applicants"
     ],
     "analytics_skill": [
         "skill distribution",
         "skills chart",
-        "most common skills"
+        "most common skills",
+        "chart for skills"
     ],
     "analytics_experience": [
         "experience distribution",
         "experience chart",
-        "years of experience"
+        "years of experience",
+        "seniority levels"
     ],
     "analytics_location": [
-    "location chart",
-    "location distribution",
-    "bar chart for locations",
-    "candidates by location"
-],
-"analytics_education": [
-    "education chart",
-    "degree distribution",
-    "qualification breakdown"
-],
+        "location chart",
+        "location distribution",
+        "bar chart for locations",
+        "candidates by location",
+        "where are candidates from"
+    ],
     "analytics_trend": [
         "resume upload trend",
         "growth over time",
-        "monthly resumes"
+        "monthly resumes",
+        "timeline of uploads"
     ],
     "semantic_search": [
         "find python developer",
         "java candidates",
-        "ml engineer with experience"
+        "ml engineer with experience",
+        "search for data scientist"
     ]
 }
 
@@ -77,3 +77,23 @@ def detect_intent(query: str, threshold=0.55):
         return "unknown"
 
     return best_intent
+
+
+def detect_chart_type(query: str, default="bar"):
+    """
+    Detect explicit chart type preference from query.
+    """
+    q = query.lower()
+    if "pie" in q:
+        return "pie"
+    if "bar" in q:
+        return "bar"
+    if "line" in q:
+        return "line"
+    if "trend" in q:
+        return "line"
+    if "distribution" in q:
+        # Pie is often better for distribution unless lots of categories
+        return "bar" 
+    
+    return default

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 
 const Navbar = () => {
   return (
@@ -12,15 +13,18 @@ const Navbar = () => {
           </div>
         </Link>
 
-        {/* Navigation Links (Optional) */}
+        {/* Navigation Links */}
         <div style={styles.navLinks}>
-          <a href="#" style={styles.navLink}>Features</a>
-          <a href="#" style={styles.navLink}>Pricing</a>
-          <a href="#" style={styles.navLink}>About</a>
+          <a href="#features" style={styles.navLink}>Features</a>
+          <a href="#about" style={styles.navLink}>About</a>
+          <a href="#contact" style={styles.navLink}>Contact</a>
         </div>
 
         {/* Action Buttons */}
         <div style={styles.actions}>
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           <Link to="/login" style={styles.loginBtn}>
             Login
           </Link>
@@ -40,13 +44,14 @@ const styles = {
     left: 0,
     right: 0,
     height: "70px",
-    background: "rgba(255, 255, 255, 0.95)",
-    border: "1px solid #e2e8f0",
+    background: "var(--bg-primary)",
+    border: "1px solid var(--border-color)",
     backdropFilter: "blur(10px)",
     zIndex: 1000,
     display: "flex",
     alignItems: "center",
-    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.05)",
+    boxShadow: "var(--shadow-sm)",
+    transition: "background-color 0.25s ease, border-color 0.25s ease",
   },
   container: {
     width: "100%",
@@ -98,7 +103,7 @@ const styles = {
   loginBtn: {
     padding: "10px 20px",
     borderRadius: "10px",
-    border: "1.5px solid #e2e8f0",
+    border: "1.5px solid var(--border-color)",
     textDecoration: "none",
     color: "var(--text-primary)",
     fontWeight: "600",

@@ -1,10 +1,16 @@
+"""
+Resume Routes
+API endpoints for resume upload, download, and management.
+No AWS/S3 dependencies - uses local file storage only.
+"""
 from fastapi import APIRouter, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from typing import List, Optional
 import uuid
 import os
 
 from ..services.resume_service import process_resume
-from ..services.s3_service import generate_presigned_url
+from ..services.file_service import get_file_path, file_exists
 from ..utils.db import resume_collection
 
 router = APIRouter()
@@ -56,12 +62,29 @@ async def upload_resumes(
 # =========================
 @router.get("/download_resume/{resume_id}")
 def download_resume(resume_id: str):
+    """Download a resume PDF by its ID"""
     resume = resume_collection.find_one({"resume_id": resume_id})
     if not resume:
         return {"error": "Resume not found"}
 
-    signed_url = generate_presigned_url(resume["resume_s3_key"])
-    return {"download_url": signed_url}
+    # Get file key from resume document
+    file_key = resume.get("file_key") or resume.get("resume_s3_key")
+    
+    if not file_key:
+        return {"error": "No file associated with this resume"}
+    
+    file_path = get_file_path(file_key)
+    
+    if file_path and os.path.exists(file_path):
+        return FileResponse(
+            path=file_path,
+            filename=f"{resume_id}.pdf",
+            media_type="application/pdf"
+        )
+    else:
+        # If file doesn't exist locally, return the stored URL (for legacy data)
+        file_url = resume.get("file_url") or resume.get("resume_url")
+        return {"download_url": file_url if file_url else "File not found"}
 
 
 # =========================
@@ -81,6 +104,19 @@ def get_user_resumes(user_id: str):
     ))
     
     print(f"📊 Found {len(resumes)} resumes for user context {user_id}")
+    return {"resumes": resumes, "count": len(resumes)}
+
+
+# =========================
+# GET ALL RESUMES (admin/debug)
+# =========================
+@router.get("/resumes")
+def get_all_resumes():
+    """Get all resumes in the system (for debugging)"""
+    resumes = list(resume_collection.find(
+        {},
+        {"_id": 0, "raw_text": 0}
+    ))
     return {"resumes": resumes, "count": len(resumes)}
 
 
@@ -107,3 +143,22 @@ def get_resume_count(user_id: Optional[str] = None):
         "total_available": total_in_db,
         "user_id": user_id
     }
+
+
+# =========================
+# DELETE RESUME
+# =========================
+@router.delete("/resume/{resume_id}")
+def delete_resume(resume_id: str, user_id: Optional[str] = None):
+    """Delete a resume by ID"""
+    filter_query = {"resume_id": resume_id}
+    if user_id:
+        filter_query["user_id"] = user_id
+    
+    result = resume_collection.delete_one(filter_query)
+    
+    if result.deleted_count > 0:
+        print(f"🗑️ Deleted resume: {resume_id}")
+        return {"success": True, "deleted": True}
+    else:
+        return {"success": False, "deleted": False, "message": "Resume not found"}

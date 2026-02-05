@@ -9,25 +9,30 @@ import {
   ArcElement,
   BarElement,
   LineElement,
+  PointElement,  // CRITICAL: Required for line charts
   CategoryScale,
   LinearScale,
   Tooltip,
   Legend,
+  Filler,  // For area fill under line charts
 } from "chart.js";
 
+// Register ALL required components including PointElement
 ChartJS.register(
   ArcElement,
   BarElement,
   LineElement,
+  PointElement,  // CRITICAL: This was missing!
   CategoryScale,
   LinearScale,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
-const ChartRenderer = ({ data: chart }) => {
+const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
   console.log("🎨 ChartRenderer received:", chart);
-  
+
   if (!chart) {
     console.warn("⚠️ No chart data provided to ChartRenderer");
     return null;
@@ -36,113 +41,131 @@ const ChartRenderer = ({ data: chart }) => {
   // Validate chart data
   if (!chart.type) {
     console.warn("⚠️ Chart type is missing");
-    return null;
+    return (
+      <div style={styles.errorContainer}>
+        <p>Chart type not specified</p>
+      </div>
+    );
   }
 
   if (!chart.labels || chart.labels.length === 0) {
     console.warn("⚠️ Chart labels missing or empty");
-    return null;
+    return (
+      <div style={styles.errorContainer}>
+        <p>No data available for chart</p>
+      </div>
+    );
   }
 
   if (!chart.values || chart.values.length === 0) {
     console.warn("⚠️ Chart values missing or empty");
-    return null;
+    return (
+      <div style={styles.errorContainer}>
+        <p>No values available for chart</p>
+      </div>
+    );
   }
 
   console.log("📊 Chart type:", chart.type);
   console.log("📊 Chart labels:", chart.labels?.length);
   console.log("📊 Chart values:", chart.values?.length);
 
-  // Generate enough colors for all data points
+  // Vibrant color palette for better visibility
   const baseColors = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A",
-    "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2",
-    "#F8B88B", "#AED6F1", "#F5B041", "#52BE80",
-    "#E74C3C", "#3498DB", "#2ECC71", "#F39C12",
-    "#9B59B6", "#1ABC9C", "#34495E", "#E67E22"
+    "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
+    "#ec4899", "#f43f5e", "#ef4444", "#f97316",
+    "#f59e0b", "#eab308", "#84cc16", "#22c55e",
+    "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9",
+    "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7"
   ];
 
-  // Generate colors dynamically if we need more
+  // Generate colors dynamically
   const colors = [];
   const borderColors = [];
   for (let i = 0; i < chart.values.length; i++) {
     const color = baseColors[i % baseColors.length];
     colors.push(color);
-    borderColors.push(color); // Same color as background
+    borderColors.push(color);
   }
+
+  // Text color for dark/light mode
+  const textColor = isDarkMode ? "#e2e8f0" : "#1e293b";
+  const gridColor = isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
 
   const data = {
     labels: chart.labels || [],
     datasets: [
       {
-        label: chart.title,
+        label: chart.title || "Data",
         data: chart.values || [],
-        backgroundColor: chart.type === "pie" ? colors : colors[0],
-        borderColor: chart.type === "pie" ? borderColors : borderColors[0],
-        borderWidth: 2,
-        fill: chart.type === "line",
+        backgroundColor: chart.type === "pie" ? colors : colors.map(c => c + "CC"),
+        borderColor: chart.type === "line" ? colors[0] : borderColors,
+        borderWidth: chart.type === "line" ? 3 : 2,
+        fill: chart.type === "line" ? {
+          target: 'origin',
+          above: colors[0] + '20',
+        } : false,
         tension: chart.type === "line" ? 0.4 : undefined,
-        pointRadius: chart.type === "line" ? 5 : undefined,
-        pointHoverRadius: chart.type === "line" ? 7 : undefined,
-        pointBackgroundColor: chart.type === "line" ? borderColors[0] : undefined,
+        pointRadius: chart.type === "line" ? 6 : undefined,
+        pointHoverRadius: chart.type === "line" ? 9 : undefined,
+        pointBackgroundColor: chart.type === "line" ? colors[0] : undefined,
         pointBorderColor: chart.type === "line" ? "#fff" : undefined,
         pointBorderWidth: chart.type === "line" ? 2 : undefined,
       },
     ],
   };
 
-  // Chart options with better visibility
+  // Chart options with proper configuration for all chart types
   const options = {
-    indexAxis: chart.type === "bar" ? "y" : "x",
+    indexAxis: chart.type === "bar" && chart.labels.length > 6 ? "y" : "x",
     scales: chart.type !== "pie" ? {
       x: {
         type: "category",
         display: true,
         ticks: {
-          font: {
-            size: 11,
-          },
+          font: { size: 11, weight: "500" },
+          color: textColor,
+          maxRotation: 45,
+          minRotation: 0,
         },
         grid: {
-          drawBorder: false,
-          color: "rgba(0, 0, 0, 0.05)",
+          display: chart.type === "line",
+          color: gridColor,
         },
       },
       y: {
         beginAtZero: true,
         display: true,
         ticks: {
-          font: {
-            size: 11,
-          },
+          font: { size: 11, weight: "500" },
+          color: textColor,
+          precision: 0,  // Only show whole numbers
         },
         grid: {
-          color: "rgba(0, 0, 0, 0.05)",
+          color: gridColor,
         },
       },
-    } : {},
+    } : undefined,
     plugins: {
       legend: {
         position: "bottom",
         labels: {
-          font: {
-            size: 11,
-            weight: "bold",
-          },
-          padding: 12,
+          font: { size: 12, weight: "600" },
+          color: textColor,
+          padding: 15,
           usePointStyle: true,
           boxWidth: 12,
         },
       },
       tooltip: {
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        backgroundColor: isDarkMode ? "rgba(30, 41, 59, 0.95)" : "rgba(15, 23, 42, 0.9)",
+        titleColor: "#fff",
+        bodyColor: "#fff",
         padding: 12,
-        titleFont: { size: 13, weight: "bold" },
-        bodyFont: { size: 12 },
-        cornerRadius: 4,
-      },
-      filler: {
-        propagate: true,
+        titleFont: { size: 14, weight: "bold" },
+        bodyFont: { size: 13 },
+        cornerRadius: 8,
+        displayColors: true,
       },
     },
     maintainAspectRatio: false,
@@ -150,32 +173,68 @@ const ChartRenderer = ({ data: chart }) => {
     layout: {
       padding: {
         top: 20,
-        bottom: 80,
+        bottom: 20,
         left: 20,
         right: 20,
       },
     },
+    animation: {
+      duration: 750,
+      easing: 'easeInOutQuart',
+    },
+  };
+
+  const containerStyle = {
+    ...styles.chartOuterContainer,
+    backgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
+    borderColor: isDarkMode ? "#334155" : "#e2e8f0",
   };
 
   return (
-    <div style={{ 
-      height: "auto",
-      maxHeight: "800px",
-      width: "100%", 
-      overflow: "auto",
-      overflowX: "visible",
-      overflowY: "auto",
-      padding: "20px",
-      border: "1px solid #e2e8f0",
-      borderRadius: "8px"
-    }}>
-      <div style={{ position: "relative", height: "600px", width: "100%" }}>
+    <div style={containerStyle}>
+      <h4 style={{
+        ...styles.chartTitle,
+        color: textColor,
+      }}>
+        {chart.title || "Chart"}
+      </h4>
+      <div style={styles.chartInnerContainer}>
         {chart.type === "pie" && <Pie data={data} options={options} />}
         {chart.type === "bar" && <Bar data={data} options={options} />}
         {chart.type === "line" && <Line data={data} options={options} />}
       </div>
     </div>
   );
+};
+
+const styles = {
+  chartOuterContainer: {
+    height: "auto",
+    width: "100%",
+    padding: "20px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+  },
+  chartTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    marginBottom: "16px",
+    textAlign: "center",
+  },
+  chartInnerContainer: {
+    position: "relative",
+    height: "400px",
+    width: "100%",
+  },
+  errorContainer: {
+    padding: "40px",
+    textAlign: "center",
+    color: "#64748b",
+    backgroundColor: "#f8fafc",
+    borderRadius: "8px",
+    border: "1px dashed #cbd5e1",
+  }
 };
 
 export default ChartRenderer;

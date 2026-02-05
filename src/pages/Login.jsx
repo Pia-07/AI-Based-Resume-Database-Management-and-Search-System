@@ -17,14 +17,14 @@ const Login = () => {
     try {
       setError("");
       setGoogleLoading(true);
-      
+
       const token = credentialResponse.credential;
-      
+
       // Send token to backend for validation and user creation
       const response = await loginWithGoogle(token);
-      
+
       console.log("Backend response:", response);
-      
+
       if (response.error) {
         setError(response.error);
         console.error("Google login error:", response.error);
@@ -33,10 +33,10 @@ const Login = () => {
         localStorage.setItem("userId", response.user_id);
         localStorage.setItem("userEmail", response.email);
         localStorage.setItem("userName", response.name || response.email.split('@')[0]);
-        
+
         // Clear chat session to show empty state on login
         localStorage.removeItem("chatSessionStarted");
-        
+
         console.log("✅ Google login successful:", response.email);
         navigate("/chatbot");
       } else {
@@ -56,47 +56,47 @@ const Login = () => {
   };
 
   const googleLogin = useGoogleLogin({
-  flow: "implicit",
-  onSuccess: async (tokenResponse) => {
-    try {
-      setGoogleLoading(true);
-      setError("");
+    flow: "implicit",
+    onSuccess: async (tokenResponse) => {
+      try {
+        setGoogleLoading(true);
+        setError("");
 
-      // ✅ CORRECT TOKEN
-      const accessToken = tokenResponse.access_token;
+        // ✅ CORRECT TOKEN
+        const accessToken = tokenResponse.access_token;
 
-      const response = await loginWithGoogle(accessToken);
+        const response = await loginWithGoogle(accessToken);
 
-      if (response?.error) {
-        setError(response.error);
-        return;
+        if (response?.error) {
+          setError(response.error);
+          return;
+        }
+
+        if (!response?.user_id) {
+          setError("Unexpected response from server");
+          return;
+        }
+
+        localStorage.setItem("userId", response.user_id);
+        localStorage.setItem("userEmail", response.email);
+        localStorage.setItem(
+          "userName",
+          response.name || response.email?.split("@")[0]
+        );
+
+        localStorage.removeItem("chatSessionStarted");
+        navigate("/chatbot");
+      } catch (err) {
+        console.error(err);
+        setError("Google login failed");
+      } finally {
+        setGoogleLoading(false);
       }
-
-      if (!response?.user_id) {
-        setError("Unexpected response from server");
-        return;
-      }
-
-      localStorage.setItem("userId", response.user_id);
-      localStorage.setItem("userEmail", response.email);
-      localStorage.setItem(
-        "userName",
-        response.name || response.email?.split("@")[0]
-      );
-
-      localStorage.removeItem("chatSessionStarted");
-      navigate("/chatbot");
-    } catch (err) {
-      console.error(err);
-      setError("Google login failed");
-    } finally {
-      setGoogleLoading(false);
-    }
-  },
-  onError: () => {
-    setError("Google authentication failed");
-  },
-});
+    },
+    onError: () => {
+      setError("Google authentication failed");
+    },
+  });
 
 
   const handleLogin = async () => {
@@ -127,10 +127,10 @@ const Login = () => {
         // Store user session
         localStorage.setItem("userId", response.user_id || "");
         localStorage.setItem("userEmail", email);
-        
+
         // Clear chat session to show empty state on next login
         localStorage.removeItem("chatSessionStarted");
-        
+
         navigate("/chatbot");
       } else {
         setError("Unexpected response from server");
@@ -279,6 +279,25 @@ const Login = () => {
             {googleLoading ? "Signing in..." : "Continue with Google"}
           </button>
 
+          {/* Guest Mode Button (Fallback) */}
+          <button
+            onClick={() => {
+              localStorage.setItem("userId", "guest_" + Date.now());
+              localStorage.setItem("userName", "Guest User");
+              navigate("/chatbot");
+            }}
+            style={{
+              ...styles.socialButton,
+              marginTop: "12px",
+              background: "transparent",
+              border: "1.5px dashed var(--text-tertiary)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <span style={styles.socialIcon}>👤</span>
+            Continue as Guest (Skip Login)
+          </button>
+
           {/* Sign Up Link */}
           <p style={styles.signupLink}>
             Don't have an account?{" "}
@@ -293,7 +312,7 @@ const Login = () => {
           </p>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
