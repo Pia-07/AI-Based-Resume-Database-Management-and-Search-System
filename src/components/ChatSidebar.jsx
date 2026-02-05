@@ -338,7 +338,7 @@ const styles = {
     right: 0,
     bottom: 0,
     background: "rgba(0, 0, 0, 0.3)",
-    display: "none",
+    display: "block", // Changed from 'none' to show overlay on mobile
     zIndex: 99,
   },
   mobileToggleBtn: {
@@ -355,7 +355,9 @@ const styles = {
     cursor: "pointer",
     zIndex: 101,
     boxShadow: "0 2px 8px rgba(99, 102, 241, 0.2)",
-    display: "none",
+    display: "flex", // Changed from 'none' to make button visible
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // Media queries will be handled inline or in index.css

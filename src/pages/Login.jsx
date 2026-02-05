@@ -17,14 +17,14 @@ const Login = () => {
     try {
       setError("");
       setGoogleLoading(true);
-      
+
       const token = credentialResponse.credential;
-      
+
       // Send token to backend for validation and user creation
       const response = await loginWithGoogle(token);
-      
+
       console.log("Backend response:", response);
-      
+
       if (response.error) {
         setError(response.error);
         console.error("Google login error:", response.error);
@@ -33,10 +33,10 @@ const Login = () => {
         localStorage.setItem("userId", response.user_id);
         localStorage.setItem("userEmail", response.email);
         localStorage.setItem("userName", response.name || response.email.split('@')[0]);
-        
+
         // Clear chat session to show empty state on login
         localStorage.removeItem("chatSessionStarted");
-        
+
         console.log("✅ Google login successful:", response.email);
         navigate("/chatbot");
       } else {
@@ -56,47 +56,56 @@ const Login = () => {
   };
 
   const googleLogin = useGoogleLogin({
-  flow: "implicit",
-  onSuccess: async (tokenResponse) => {
-    try {
-      setGoogleLoading(true);
-      setError("");
+    flow: "implicit",
+    onSuccess: async (tokenResponse) => {
+      try {
+        console.log("🔐 Google OAuth Success - Token received");
+        setGoogleLoading(true);
+        setError("");
 
-      // ✅ CORRECT TOKEN
-      const accessToken = tokenResponse.access_token;
+        // Access token from Google OAuth implicit flow
+        const accessToken = tokenResponse.access_token;
+        console.log("📤 Sending access token to backend (length:", accessToken?.length, ")");
 
-      const response = await loginWithGoogle(accessToken);
+        const response = await loginWithGoogle(accessToken);
+        console.log("📥 Backend response:", response);
 
-      if (response?.error) {
-        setError(response.error);
-        return;
+        if (response?.error) {
+          console.error("❌ Backend returned error:", response.error);
+          setError(response.error);
+          return;
+        }
+
+        if (!response?.user_id) {
+          console.error("❌ Invalid response structure:", response);
+          setError("Unexpected response from server. Check console for details.");
+          return;
+        }
+
+        console.log("✅ Google login successful for:", response.email);
+
+        localStorage.setItem("userId", response.user_id);
+        localStorage.setItem("userEmail", response.email);
+        localStorage.setItem(
+          "userName",
+          response.name || response.email?.split("@")[0]
+        );
+
+        localStorage.removeItem("chatSessionStarted");
+        console.log("🚀 Redirecting to chatbot...");
+        navigate("/chatbot");
+      } catch (err) {
+        console.error("❌ Google login error:", err);
+        setError(`Google login failed: ${err.message || "Unknown error"}`);
+      } finally {
+        setGoogleLoading(false);
       }
-
-      if (!response?.user_id) {
-        setError("Unexpected response from server");
-        return;
-      }
-
-      localStorage.setItem("userId", response.user_id);
-      localStorage.setItem("userEmail", response.email);
-      localStorage.setItem(
-        "userName",
-        response.name || response.email?.split("@")[0]
-      );
-
-      localStorage.removeItem("chatSessionStarted");
-      navigate("/chatbot");
-    } catch (err) {
-      console.error(err);
-      setError("Google login failed");
-    } finally {
-      setGoogleLoading(false);
-    }
-  },
-  onError: () => {
-    setError("Google authentication failed");
-  },
-});
+    },
+    onError: (error) => {
+      console.error("❌ Google OAuth popup failed:", error);
+      setError("Google authentication failed. Please try again.");
+    },
+  });
 
 
   const handleLogin = async () => {
@@ -127,10 +136,10 @@ const Login = () => {
         // Store user session
         localStorage.setItem("userId", response.user_id || "");
         localStorage.setItem("userEmail", email);
-        
+
         // Clear chat session to show empty state on next login
         localStorage.removeItem("chatSessionStarted");
-        
+
         navigate("/chatbot");
       } else {
         setError("Unexpected response from server");
