@@ -5,6 +5,7 @@
 **Backend Server**: Running on `http://127.0.0.1:8000`
 
 **Test Account Created**:
+
 - **Email**: `demo@smarthire.com`
 - **Password**: `Demo1234`
 
@@ -13,14 +14,17 @@
 ## 🚀 Quick Start
 
 ### 1. **Ensure Backend is Running**
+
 The backend must be running on port 8000 for login/signup to work.
 
 Check if it's running:
+
 ```bash
 lsof -i :8000
 ```
 
 If not running, start it:
+
 ```bash
 cd Backend
 source .venv/bin/activate
@@ -28,6 +32,7 @@ python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### 2. **Start Frontend Dev Server**
+
 ```bash
 npm run dev
 ```
@@ -37,6 +42,7 @@ The app will open on `http://localhost:5173` (or next available port)
 ### 3. **Login or Sign Up**
 
 **Option A: Login with Test Account**
+
 1. Go to http://localhost:5173/login
 2. Enter:
    - **Email**: `demo@smarthire.com`
@@ -44,6 +50,7 @@ The app will open on `http://localhost:5173` (or next available port)
 3. Click "Sign In"
 
 **Option B: Create New Account**
+
 1. Go to http://localhost:5173/signup
 2. Fill in form with:
    - **Email**: Any valid email (e.g., `your.name@example.com`)
@@ -52,7 +59,9 @@ The app will open on `http://localhost:5173` (or next available port)
 3. Click "Create Account"
 
 ### 4. **Access Chatbot**
+
 After login, you'll be redirected to `/chatbot` where you can:
+
 - Start new conversations
 - View chat history in sidebar
 - Delete previous chats
@@ -65,6 +74,7 @@ After login, you'll be redirected to `/chatbot` where you can:
 ### **Issue: "Login Failed" or Can't Connect**
 
 **Solution**:
+
 1. Check backend is running: `lsof -i :8000`
 2. Verify it's on correct port (8000)
 3. Check frontend is calling correct URL: `http://127.0.0.1:8000`
@@ -75,6 +85,7 @@ After login, you'll be redirected to `/chatbot` where you can:
 **Symptoms**: Server raises `ModuleNotFoundError: No module named 'google.generativeai'` or chat endpoints return "LLM service unavailable" messages.
 
 **Solution**:
+
 - Install the Gemini client in the backend virtual environment:
   ```bash
   # Activate your venv, then
@@ -97,6 +108,7 @@ If you still see errors, check the server logs for messages like "⚠️ 'google
 ### **Issue: "Invalid Credentials"**
 
 **Solutions**:
+
 - Make sure email/password are correct
 - Try the test account: `demo@smarthire.com` / `Demo1234`
 - Create a new account if you forgot password
@@ -104,6 +116,7 @@ If you still see errors, check the server logs for messages like "⚠️ 'google
 ### **Issue: Port 8000 Already in Use**
 
 **Solution**:
+
 ```bash
 # Kill the process using port 8000
 lsof -ti:8000 | xargs kill -9
@@ -118,13 +131,16 @@ python -m uvicorn app.main:app --reload --port 8001
 ## 📋 API Endpoints
 
 ### Authentication
+
 - **POST** `/auth/signup` - Create new account
+
   ```json
   {
     "email": "user@example.com",
     "password": "SecurePass123"
   }
   ```
+
   Response: `{ "message": "Signup successful" }`
 
 - **POST** `/auth/login` - Login user
@@ -137,6 +153,7 @@ python -m uvicorn app.main:app --reload --port 8001
   Response: `{ "message": "Login successful", "user_id": "uuid" }`
 
 ### Chat
+
 - **POST** `/chat` - Send message to AI
   ```json
   {
@@ -197,6 +214,7 @@ python -m uvicorn app.main:app --reload --port 8001
 ## ✨ Recent Improvements
 
 ### UI/UX Enhancements
+
 - ✅ Premium design system with color tokens
 - ✅ Smooth animations and transitions
 - ✅ Dark mode support
@@ -206,6 +224,7 @@ python -m uvicorn app.main:app --reload --port 8001
 - ✅ Markdown support in chat
 
 ### Login/Signup Improvements
+
 - ✅ Split-panel design (branding + form)
 - ✅ Icon-prefixed input fields
 - ✅ Real-time validation feedback
@@ -215,6 +234,7 @@ python -m uvicorn app.main:app --reload --port 8001
 - ✅ Better error handling and messages
 
 ### Chat Improvements
+
 - ✅ ChatGPT-like sidebar with history
 - ✅ Auto-generated chat titles
 - ✅ Delete chat functionality
@@ -237,6 +257,7 @@ python -m uvicorn app.main:app --reload --port 8001
 ## 📞 Support
 
 For issues or questions:
+
 1. Check browser console (F12) for error details
 2. Check backend logs for server errors
 3. Verify backend is running on correct port

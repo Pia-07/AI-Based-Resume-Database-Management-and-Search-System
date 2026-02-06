@@ -336,15 +336,17 @@ const styles = {
     borderTop: "1px solid #e2e8f0",
   },
   cancelBtn: {
-    padding: "10px 20px",
-    background: "var(--bg-secondary)",
-    border: "1px solid #e2e8f0",
-    borderRadius: "8px",
-    fontSize: "13px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 150ms ease",
-  },
+  padding: "10px 20px",
+  background: "#ffffff",        // white background
+  color: "#000000",             // black text
+  border: "1.5px solid #000000",// black border
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
+  transition: "all 150ms ease",
+},
+
 };
 
 export default ResumeUpload;

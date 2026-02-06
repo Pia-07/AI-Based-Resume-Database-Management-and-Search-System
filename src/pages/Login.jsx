@@ -59,6 +59,7 @@ const Login = () => {
     flow: "implicit",
     onSuccess: async (tokenResponse) => {
       try {
+<<<<<<< HEAD
         setGoogleLoading(true);
         setError("");
 
@@ -68,15 +69,40 @@ const Login = () => {
         const response = await loginWithGoogle(accessToken);
 
         if (response?.error) {
+=======
+        console.log("🔐 Google OAuth Success - Token received");
+        setGoogleLoading(true);
+        setError("");
+
+        // Access token from Google OAuth implicit flow
+        const accessToken = tokenResponse.access_token;
+        console.log("📤 Sending access token to backend (length:", accessToken?.length, ")");
+
+        const response = await loginWithGoogle(accessToken);
+        console.log("📥 Backend response:", response);
+
+        if (response?.error) {
+          console.error("❌ Backend returned error:", response.error);
+>>>>>>> 1cd3fc830e306b0ccfd50c1b9677b97cb1d084e6
           setError(response.error);
           return;
         }
 
         if (!response?.user_id) {
+<<<<<<< HEAD
           setError("Unexpected response from server");
           return;
         }
 
+=======
+          console.error("❌ Invalid response structure:", response);
+          setError("Unexpected response from server. Check console for details.");
+          return;
+        }
+
+        console.log("✅ Google login successful for:", response.email);
+
+>>>>>>> 1cd3fc830e306b0ccfd50c1b9677b97cb1d084e6
         localStorage.setItem("userId", response.user_id);
         localStorage.setItem("userEmail", response.email);
         localStorage.setItem(
@@ -85,16 +111,30 @@ const Login = () => {
         );
 
         localStorage.removeItem("chatSessionStarted");
+<<<<<<< HEAD
         navigate("/chatbot");
       } catch (err) {
         console.error(err);
         setError("Google login failed");
+=======
+        console.log("🚀 Redirecting to chatbot...");
+        navigate("/chatbot");
+      } catch (err) {
+        console.error("❌ Google login error:", err);
+        setError(`Google login failed: ${err.message || "Unknown error"}`);
+>>>>>>> 1cd3fc830e306b0ccfd50c1b9677b97cb1d084e6
       } finally {
         setGoogleLoading(false);
       }
     },
+<<<<<<< HEAD
     onError: () => {
       setError("Google authentication failed");
+=======
+    onError: (error) => {
+      console.error("❌ Google OAuth popup failed:", error);
+      setError("Google authentication failed. Please try again.");
+>>>>>>> 1cd3fc830e306b0ccfd50c1b9677b97cb1d084e6
     },
   });
 
