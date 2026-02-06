@@ -12,7 +12,7 @@ from .routes.chat_routes import router as chat_router
 
 app = FastAPI()
 
-# Serve local uploaded files (no AWS/S3 - using local storage only)
+# Serve local uploaded files when S3 is not configured
 uploads_dir = os.getenv("LOCAL_UPLOADS_DIR", "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/files", StaticFiles(directory=uploads_dir), name="files")

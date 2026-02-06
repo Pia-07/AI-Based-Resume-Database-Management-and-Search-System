@@ -19,6 +19,3 @@ passlib[bcrypt]
 
 requests
 google-generative-ai
-
-# PDF text extraction
-pdfplumber
