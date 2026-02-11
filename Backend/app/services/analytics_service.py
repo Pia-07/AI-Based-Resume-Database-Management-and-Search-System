@@ -113,8 +113,7 @@ def location_distribution(user_id: Optional[str] = None, chart_type: str = "bar"
             extracted_loc = _extract_location_from_text(raw_text)
             if extracted_loc:
                 locations.append(extracted_loc)
-            else:
-                locations.append("Not Specified")
+            # ELSE: Do NOT append "Not Specified" - simply skip this resume for the location chart
     
     if not locations:
         return {

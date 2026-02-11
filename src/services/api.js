@@ -154,6 +154,7 @@ export const saveChatToBackend = async (chatId, title, messages) => {
           id: msg.id,
           sender: msg.sender,
           text: msg.text,
+          chart: msg.chart,
           timestamp: msg.timestamp
         }))
       }),

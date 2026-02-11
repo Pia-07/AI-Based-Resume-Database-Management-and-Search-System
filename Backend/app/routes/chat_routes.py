@@ -113,8 +113,8 @@ def chat(request: ChatRequest):
         include_cta = False
 
     elif intent == "greeting":
-        context_text = "The user is greeting you. Introduce yourself as the AI Resume Assistant."
-        include_cta = True
+        context_text = "GREETING: Introduce yourself as SmartHire, the AI hiring assistant. Be professional and mention that you can help with resume analysis, candidate search, and hiring insights."
+        include_cta = False
 
     else:
         # 2️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)

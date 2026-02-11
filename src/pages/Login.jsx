@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { loginUser, loginWithGoogle } from "../services/api";
+import Logo from "../components/Logo";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -164,7 +165,7 @@ const Login = () => {
       <div style={styles.brandingSide}>
         <div style={styles.brandContent}>
           <div style={styles.logo}>
-            <span style={styles.logoText}>🧠</span>
+            <Logo size="80px" color="white" />
           </div>
           <h1 style={styles.brandTitle}>SmartHire</h1>
           <p style={styles.brandDesc}>
@@ -329,11 +330,13 @@ const styles = {
   container: {
     display: "flex",
     minHeight: "100vh",
-    background: "var(--bg-secondary)",
+    // Richer background gradient
+    background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%)",
   },
   brandingSide: {
     flex: 1,
-    background: "linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)",
+    // Deeper, more premium gradient for branding
+    background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

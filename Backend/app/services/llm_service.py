@@ -51,11 +51,7 @@ def generate_answer(
     cta_instruction = ""
     if include_cta:
         cta_instruction = """
-If relevant, suggest a helpful follow-up action such as:
-- Viewing more candidates
-- Scheduling interviews
-- Requesting detailed analysis
-Only include if genuinely useful, not every response needs a follow-up.
+If genuinely helpful, you may optionally suggest a natural next step, such as viewing more candidates or exploring analytics. Keep it brief and only when it adds value.
 """
     else:
         cta_instruction = "Do NOT include any call-to-action or follow-up suggestions."
@@ -70,22 +66,9 @@ STRICT RULES (NON-NEGOTIABLE):
 2. NEVER invent, guess, or hallucinate information
 3. If the answer is NOT in the resume, say: "This information is not available in the uploaded resume."
 4. Be concise, professional, and direct
-5. Use markdown formatting for readability
-
-═══════════════════════════════════════════════════════════════
-RESPONSE FORMAT (FOLLOW THIS STRUCTURE):
-═══════════════════════════════════════════════════════════════
-
-**Context:**
-Brief explanation of which part of the resume you're referencing (1-2 sentences max)
-
-**Answer:**
-Clear, direct answer to the question
-
-**Key Points:**
-- Use bullet points
-- Keep each point short and scannable
-- Only include resume-verified facts
+5. Use plain text or simple markdown (e.g. bold, bullet points)
+6. DO NOT use headings like "Context:", "Answer:", "Key Points:" in your output. Just give the answer directly.
+7. If data is requested in a table format, provide a standard Markdown table.
 
 {cta_instruction}
 
@@ -105,10 +88,12 @@ USER QUESTION:
 {question}
 
 IMPORTANT REMINDERS:
-- Generate a UNIQUE response based on the specific question
-- Do NOT repeat previous answers
-- If context is empty or irrelevant, clearly state the information is not available
-- Match your response length to the question complexity
+- DO NOT generate ASCII charts or text-based graphs (e.g. using symbols like *, |, -).
+- The system will render a graphical chart automatically if needed.
+- Provide a clean, direct answer.
+- DO NOT Include "Context", "Answer" or "Key Points" headers.
+- If the user asks for a table, format it as a markdown table.
+- Use bullet points for lists.
 """
 
     # If the client is not available, return an informative message instead of crashing
