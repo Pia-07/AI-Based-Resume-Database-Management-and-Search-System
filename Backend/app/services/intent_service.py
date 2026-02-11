@@ -7,7 +7,7 @@ intent_model = SentenceTransformer("all-MiniLM-L6-v2")
 # Intent examples (THIS IS THE NLU BRAIN)
 INTENT_EXAMPLES = {
     "greeting": [
-        "hi", "hello", "hey", "good morning", "hyy"
+        "hi", "hello", "hey", "good morning", "hyy", "hi there"
     ],
     "count_resumes": [
         "how many resumes do you have",
@@ -47,6 +47,7 @@ INTENT_EXAMPLES = {
         "timeline of uploads"
     ],
     "semantic_search": [
+        # Skills-based queries
         "find python developer",
         "java candidates",
         "ml engineer with experience",
@@ -61,7 +62,8 @@ intent_embeddings = {
 }
 
 
-def detect_intent(query: str, threshold=0.55):
+def detect_intent(query: str, threshold=0.45):
+    """Detect user intent from query. Lower threshold means more queries go to semantic search."""
     query_embedding = intent_model.encode(query, convert_to_tensor=True)
 
     best_intent = "unknown"
@@ -73,6 +75,8 @@ def detect_intent(query: str, threshold=0.55):
             best_score = score
             best_intent = intent
 
+    print(f"🧠 Intent detection: '{query[:50]}...' → {best_intent} (score: {best_score:.3f}, threshold: {threshold})")
+    
     if best_score < threshold:
         return "unknown"
 

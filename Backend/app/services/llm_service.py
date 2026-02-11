@@ -66,26 +66,26 @@ Only include if genuinely useful, not every response needs a follow-up.
 STRICT RULES (NON-NEGOTIABLE):
 ═══════════════════════════════════════════════════════════════
 
-1. ONLY use information from the RESUME CONTEXT below
-2. NEVER invent, guess, or hallucinate information
-3. If the answer is NOT in the resume, say: "This information is not available in the uploaded resume."
-4. Be concise, professional, and direct
-5. Use markdown formatting for readability
+1. ONLY use information from the RESUME CONTEXT below - each section starts with [Candidate: Name]
+2. NEVER invent, guess, or hallucinate information. If the count is 0, say 0.
+3. If the answer is NOT in the resume context, say: "This information is not available in the uploaded resumes."
+4. Reference specific candidates by name when answering
+5. Be concise, professional, and direct. Do NOT use meta-labels like 'Answer:' or 'Context:'.
+6. Use markdown formatting for readability.
+7. **FOR ANALYTICS/COUNTS/LISTS**: You MUST return a clean Markdown Table if the user asks for comparisons, counts, or distributions.
+   Example Table:
+   | Location | Student Count |
+   |----------|--------------|
+   | Mumbai   | 12           |
+   | Pune     | 8            |
 
 ═══════════════════════════════════════════════════════════════
-RESPONSE FORMAT (FOLLOW THIS STRUCTURE):
+RESPONSE FORMAT:
 ═══════════════════════════════════════════════════════════════
 
-**Context:**
-Brief explanation of which part of the resume you're referencing (1-2 sentences max)
-
-**Answer:**
-Clear, direct answer to the question
-
-**Key Points:**
-- Use bullet points
-- Keep each point short and scannable
-- Only include resume-verified facts
+Provide a clear, natural language answer.
+If listing data, use bullet points or a markdown table.
+Do NOT include "Context:" or "Answer:" headers.
 
 {cta_instruction}
 
@@ -95,7 +95,7 @@ PREVIOUS CONVERSATION (for context):
 {history_text if history_text else "No previous messages."}
 
 ═══════════════════════════════════════════════════════════════
-RESUME CONTEXT:
+RESUME CONTEXT (Source of Truth):
 ═══════════════════════════════════════════════════════════════
 {context if context else "No resume data available."}
 
@@ -104,11 +104,12 @@ USER QUESTION:
 ═══════════════════════════════════════════════════════════════
 {question}
 
-IMPORTANT REMINDERS:
-- Generate a UNIQUE response based on the specific question
+CRITICAL REMINDERS:
+- Each chunk above represents REAL data
+- Generate a UNIQUE response based on this specific question
+- If multiple candidates match, mention all of them
 - Do NOT repeat previous answers
-- If context is empty or irrelevant, clearly state the information is not available
-- Match your response length to the question complexity
+- Reference candidate names from the context
 """
 
     # If the client is not available, return an informative message instead of crashing
@@ -117,12 +118,17 @@ IMPORTANT REMINDERS:
         return "LLM service unavailable: please install 'google-generative-ai' and set GEMINI_API_KEY in your environment."
 
     try:
+        print(f"🤖 Calling Gemini API with {len(prompt)} char prompt...")
         response = client.models.generate_content(
             model="models/gemini-flash-latest",
             contents=prompt
         )
-        return response.text.strip()
+        result = response.text.strip()
+        print(f"✅ Gemini response received: {len(result)} chars")
+        return result
 
     except Exception as e:
         print(f"❌ Gemini API error: {e}")
+        import traceback
+        traceback.print_exc()
         return "I apologize, but I'm unable to process your request at the moment. Please try again shortly."

@@ -122,6 +122,8 @@ def get_all_resumes():
 
 # =========================
 # GET RESUME COUNT
+# NOTE: This MUST come BEFORE /resumes/{user_id} to avoid
+# FastAPI matching "count" as a user_id parameter!
 # =========================
 @router.get("/resumes/count")
 def get_resume_count(user_id: Optional[str] = None):

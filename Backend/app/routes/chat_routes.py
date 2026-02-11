@@ -13,7 +13,7 @@ from ..services.intent_service import detect_intent, detect_chart_type
 from ..services.analytics_service import (
     generate_chart,
 )
-from ..services.embedding_service import build_vector_store, search_similar
+from ..services.embedding_service import build_vector_store, search_similar, get_index_stats
 from ..services.llm_service import generate_answer
 from ..services.resume_service import get_resume_content_for_context
 from ..utils.db import resume_collection, chat_collection
@@ -51,7 +51,7 @@ def build_resume_context(resumes: List[dict]) -> List[str]:
 
 
 def format_chart_data_for_llm(chart_data: dict) -> str:
-    """Format chart data as text so LLM can explain it."""
+    """Format chart data as text so LLM can explain it and generate a table."""
     if not chart_data or not chart_data.get("labels"):
         return "No analytics data available."
     
@@ -59,7 +59,8 @@ def format_chart_data_for_llm(chart_data: dict) -> str:
     labels = chart_data.get("labels", [])
     values = chart_data.get("values", [])
     
-    # Limit to top 10 for context window
+    # Create a structured list for the LLM
+    text += "The following data represents the chart. PLEASE PRESENT THIS AS A MARKDOWN TABLE:\n"
     for i, (label, value) in enumerate(zip(labels, values)):
         if i >= 15: break
         text += f"- {label}: {value}\n"

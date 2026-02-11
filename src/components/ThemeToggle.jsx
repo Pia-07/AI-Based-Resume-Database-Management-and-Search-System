@@ -9,7 +9,11 @@ import { useState, useEffect } from "react";
  */
 const ThemeToggle = () => {
     const [isDark, setIsDark] = useState(() => {
-        // Check localStorage first
+        // Check current document state first (consistency with App.jsx)
+        if (document.documentElement.getAttribute("data-theme") === "dark") {
+            return true;
+        }
+        // Check localStorage
         const saved = localStorage.getItem("theme");
         if (saved) {
             return saved === "dark";

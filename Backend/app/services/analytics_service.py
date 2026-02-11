@@ -94,34 +94,47 @@ def experience_distribution(user_id: Optional[str] = None, chart_type: str = "ba
 def location_distribution(user_id: Optional[str] = None, chart_type: str = "bar"):
     """
     Get geographic distribution of ALL candidates.
-    Cleans up 'Unknown' values and extracts location from raw_text if needed.
+    Strictly cleans up invalid values and extracts location from raw_text if needed.
     """
-    resumes = list(resume_collection.find({}, {"location": 1, "raw_text": 1}))
+    resumes = list(resume_collection.find({}, {"location": 1}))
     
     locations = []
+    invalid_count = 0
+    
+    # invalid_values to lowercase for case-insensitive comparison
+    invalid_values = {
+        "unknown", "null", "none", "", "n/a", "not specified", "not provided", 
+        "anywhere", "remote", "open to relocate", "flexible"
+    }
+
     for r in resumes:
         loc = r.get("location", "")
         
         # Clean up location value
-        if loc and loc.strip() and loc.lower() not in ["unknown", "null", "none", ""]:
-            # Normalize location (capitalize first letter)
-            loc = loc.strip().title()
-            locations.append(loc)
-        else:
-            # Try to extract location from raw_text (look for common patterns)
-            raw_text = r.get("raw_text", "") or ""
-            extracted_loc = _extract_location_from_text(raw_text)
-            if extracted_loc:
-                locations.append(extracted_loc)
+        if loc and isinstance(loc, str):
+            cleaned_loc = loc.strip()
+            if len(cleaned_loc) > 2 and cleaned_loc.lower() not in invalid_values:
+                # Normalize location (capitalize first letter of each word)
+                # Also handle common messy formats if needed, but Title Case is a good start
+                locations.append(cleaned_loc.title())
             else:
-                locations.append("Not Specified")
-    
+                invalid_count += 1
+        else:
+            invalid_count += 1
+            
+            # DO NOT try to extract from raw_text.
+            # This causes massive false positives (e.g., extracting "Jaipur" from college names).
+            # If the database field is empty/unknown, we simply exclude it from the chart
+            # to make the chart accurate and meaningful.
+
+    print(f"📍 Location Filtering: {len(locations)} valid, {invalid_count} invalid/missing locations.")
+
     if not locations:
         return {
             "type": chart_type,
             "title": "Location Distribution",
-            "labels": ["No data"],
-            "values": [1]
+            "labels": ["No location data"],
+            "values": [0]
         }
     
     counter = Counter(locations)
@@ -129,7 +142,7 @@ def location_distribution(user_id: Optional[str] = None, chart_type: str = "bar"
     # Get top 10 locations for better visualization
     top_locations = counter.most_common(10)
     
-    print(f"📍 Location distribution: {len(top_locations)} unique locations from {len(resumes)} resumes")
+    print(f"📍 Location distribution: {len(top_locations)} top locations from {len(locations)} valid entries")
     
     return {
         "type": chart_type,

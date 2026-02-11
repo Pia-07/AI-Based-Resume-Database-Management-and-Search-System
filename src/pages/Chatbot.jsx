@@ -56,7 +56,10 @@ const Chatbot = () => {
           const transformedChats = backendChats.map(chat => ({
             id: chat.chat_id,
             title: chat.title || "New Conversation",
-            messages: chat.messages || [],
+            messages: chat.messages ? chat.messages.map(m => ({
+              ...m,
+              chart: m.chart || null // Ensure chart data is carried over
+            })) : [],
             createdAt: chat.created_at,
             updatedAt: chat.updated_at,
           }));

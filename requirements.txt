@@ -18,4 +18,5 @@ bcrypt
 passlib[bcrypt]
 
 requests
-google-generative-ai
+google-genai
+pdfplumber

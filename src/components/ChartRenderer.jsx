@@ -17,17 +17,20 @@ import {
   Filler,  // For area fill under line charts
 } from "chart.js";
 
-// Register ALL required components including PointElement
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+// Register ALL required components including PointElement and DataLabels plugin
 ChartJS.register(
   ArcElement,
   BarElement,
   LineElement,
-  PointElement,  // CRITICAL: This was missing!
+  PointElement,
   CategoryScale,
   LinearScale,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  ChartDataLabels
 );
 
 const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
@@ -156,6 +159,18 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
           usePointStyle: true,
           boxWidth: 12,
         },
+      },
+      datalabels: {
+        display: true,
+        color: textColor,
+        anchor: 'end',
+        align: 'top',
+        offset: 4,
+        font: {
+          weight: 'bold',
+          size: 12
+        },
+        formatter: (value) => Math.round(value),
       },
       tooltip: {
         backgroundColor: isDarkMode ? "rgba(30, 41, 59, 0.95)" : "rgba(15, 23, 42, 0.9)",
