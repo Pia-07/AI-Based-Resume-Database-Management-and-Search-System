@@ -51,11 +51,7 @@ def generate_answer(
     cta_instruction = ""
     if include_cta:
         cta_instruction = """
-If relevant, suggest a helpful follow-up action such as:
-- Viewing more candidates
-- Scheduling interviews
-- Requesting detailed analysis
-Only include if genuinely useful, not every response needs a follow-up.
+If genuinely helpful, you may optionally suggest a natural next step, such as viewing more candidates or exploring analytics. Keep it brief and only when it adds value.
 """
     else:
         cta_instruction = "Do NOT include any call-to-action or follow-up suggestions."
@@ -86,6 +82,7 @@ RESPONSE FORMAT:
 Provide a clear, natural language answer.
 If listing data, use bullet points or a markdown table.
 Do NOT include "Context:" or "Answer:" headers.
+Do NOT generate ASCII charts or text-based graphs; the system handles visualization.
 
 {cta_instruction}
 
@@ -110,6 +107,8 @@ CRITICAL REMINDERS:
 - If multiple candidates match, mention all of them
 - Do NOT repeat previous answers
 - Reference candidate names from the context
+- DO NOT generate ASCII charts or text-based graphs.
+- Provide a clean, direct answer.
 """
 
     # If the client is not available, return an informative message instead of crashing

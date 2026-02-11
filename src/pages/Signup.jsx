@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { signupUser, loginWithGoogle } from "../services/api";
+import Logo from "../components/Logo";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -137,7 +138,7 @@ const Signup = () => {
       <div style={styles.brandingSide}>
         <div style={styles.brandContent}>
           <div style={styles.logo}>
-            <span style={styles.logoText}>🚀</span>
+            <Logo size="80px" color="white" />
           </div>
           <h1 style={styles.brandTitle}>Join SmartHire</h1>
           <p style={styles.brandDesc}>
@@ -337,11 +338,13 @@ const styles = {
   container: {
     display: "flex",
     minHeight: "100vh",
-    background: "var(--bg-secondary)",
+    // Richer background gradient
+    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #d1fae5 100%)",
   },
   brandingSide: {
     flex: 1,
-    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    // Deeper green gradient for consistency with signup theme
+    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

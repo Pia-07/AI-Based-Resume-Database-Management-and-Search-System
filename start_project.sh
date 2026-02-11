@@ -13,12 +13,17 @@ echo "🚀 Starting Backend (FastAPI)..."
 cd "$BACKEND_DIR"
 
 # Activate the correct virtual environment
+# Activate the correct virtual environment
 if [ -d "venv" ]; then
     source venv/bin/activate
 elif [ -d ".venv" ]; then
     source .venv/bin/activate
+elif [ -d "../venv" ]; then
+    source ../venv/bin/activate
+elif [ -d "../.venv" ]; then
+    source ../.venv/bin/activate
 else
-    echo "❌ Virtual environment not found in $BACKEND_DIR"
+    echo "❌ Virtual environment not found in $BACKEND_DIR or parent directory"
     exit 1
 fi
 

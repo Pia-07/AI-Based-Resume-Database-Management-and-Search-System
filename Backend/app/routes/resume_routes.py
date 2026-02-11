@@ -38,11 +38,27 @@ async def upload_resumes(
         resume_id = str(uuid.uuid4())
         file_path = f"{TEMP_DIR}/{resume_id}.pdf"
 
-        with open(file_path, "wb") as f:
-            f.write(await file.read())
+        # Read file content safely
+        try:
+            await file.seek(0)
+            content = await file.read()
+            
+            if len(content) == 0:
+                print(f"⚠️ Warning: Empty file received {file.filename}")
+                continue
+                
+            with open(file_path, "wb") as f:
+                f.write(content)
+        except Exception as e:
+            print(f"❌ Error saving file {file.filename}: {e}")
+            continue
 
         # Process resume with user_id for filtering
-        resume_doc = process_resume(file_path, resume_id, user_id)
+        try:
+            resume_doc = process_resume(file_path, resume_id, user_id)
+        except Exception as e:
+            print(f"❌ Error processing resume {resume_id}: {e}")
+            continue
 
         results.append({
             "resume_id": resume_id,

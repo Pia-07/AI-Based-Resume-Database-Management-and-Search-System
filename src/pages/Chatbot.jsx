@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import Logo from "../components/Logo";
 import ChatSidebar from "../components/ChatSidebar";
 import ChatMessage from "../components/ChatMessage";
 import ChatInputBar from "../components/ChatInputBar";
@@ -313,7 +314,9 @@ const Chatbot = () => {
         <div style={styles.messagesContainer}>
           {messages.length === 0 ? (
             <div style={styles.emptyState}>
-              <div style={styles.emptyIcon}>💬</div>
+              <div style={styles.emptyIcon}>
+                <Logo size="64px" color="var(--primary)" />
+              </div>
               <h2 style={styles.emptyTitle}>Start a New Conversation</h2>
               <p style={styles.emptyDesc}>
                 Ask me anything about your resumes, candidates, or hiring insights.
@@ -354,7 +357,7 @@ const styles = {
   container: {
     display: "flex",
     height: "100vh",
-    background: "var(--bg-secondary)",
+    background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)", // Smooth blue -> white gradient
   },
   main: {
     flex: 1,

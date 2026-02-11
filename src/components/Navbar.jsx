@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
+import Logo from "./Logo";
 
 const Navbar = () => {
   return (
@@ -8,7 +9,7 @@ const Navbar = () => {
         {/* Logo & Brand */}
         <Link to="/" style={styles.brandLink}>
           <div style={styles.logo}>
-            <span style={styles.logoIcon}>🧠</span>
+            <Logo size="28px" color="var(--primary)" />
             <span style={styles.logoText}>SmartHire</span>
           </div>
         </Link>

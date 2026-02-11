@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Logo from "./Logo";
 
 /**
  * ChatSidebar - Premium ChatGPT-like sidebar for chat history and navigation
@@ -45,7 +46,9 @@ const ChatSidebar = ({
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.logo}>
-            <span style={styles.logoIcon}>🧠</span>
+            <div style={styles.logoIconWrapper}>
+              <Logo size="24px" color="var(--primary)" />
+            </div>
             <span style={styles.logoText}>SmartHire</span>
           </div>
           <button
@@ -188,6 +191,11 @@ const styles = {
   },
   logoIcon: {
     fontSize: "20px",
+  },
+  logoIconWrapper: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoText: {
     fontSize: "16px",

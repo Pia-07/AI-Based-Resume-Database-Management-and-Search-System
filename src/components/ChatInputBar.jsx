@@ -109,7 +109,7 @@ const styles = {
     maxHeight: "120px",
     transition: "all 150ms ease",
     background: "var(--bg-secondary)",
-    color: "#000000",
+    color: "var(--text-primary)",
     fontWeight: "500",
   },
   sendButton: {

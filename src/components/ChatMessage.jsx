@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import ChartRenderer from "./ChartRenderer";
 import { useState, useEffect } from "react";
 
@@ -110,6 +111,7 @@ const ChatMessage = ({ sender, text, chart, isLoading, isTiming }) => {
             color: isUser ? "#ffffff" : getTextColor(),
           }}>
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 p: ({ node, ...props }) => (
                   <p style={{
