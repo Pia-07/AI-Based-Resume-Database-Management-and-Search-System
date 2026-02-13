@@ -9,7 +9,7 @@ const Navbar = () => {
         {/* Logo & Brand */}
         <Link to="/" style={styles.brandLink}>
           <div style={styles.logo}>
-            <Logo size="28px" color="var(--primary)" />
+            <Logo size="28px" />
             <span style={styles.logoText}>SmartHire</span>
           </div>
         </Link>

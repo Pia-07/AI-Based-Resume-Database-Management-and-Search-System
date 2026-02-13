@@ -138,7 +138,9 @@ const Signup = () => {
       <div style={styles.brandingSide}>
         <div style={styles.brandContent}>
           <div style={styles.logo}>
-            <Logo size="80px" color="white" />
+            <div style={styles.logoContainer}>
+              <Logo size="64px" />
+            </div>
           </div>
           <h1 style={styles.brandTitle}>Join SmartHire</h1>
           <p style={styles.brandDesc}>
@@ -360,8 +362,18 @@ const styles = {
     zIndex: 1,
   },
   logo: {
-    fontSize: "64px",
-    marginBottom: "24px",
+    marginBottom: "32px",
+    display: "flex",
+    justifyContent: "center",
+  },
+  logoContainer: {
+    padding: "16px",
+    background: "white",
+    borderRadius: "20px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoText: {
     display: "inline-block",
@@ -374,7 +386,7 @@ const styles = {
   },
   brandDesc: {
     fontSize: "16px",
-    opacity: 0.9,
+    color: "rgba(255, 255, 255, 0.9)",
     marginBottom: "40px",
     lineHeight: "1.6",
   },
@@ -388,7 +400,7 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     fontSize: "14px",
-    opacity: 0.95,
+    color: "rgba(255, 255, 255, 0.95)",
   },
   featureCheck: {
     display: "flex",
@@ -428,7 +440,7 @@ const styles = {
   },
   formSubtitle: {
     fontSize: "14px",
-    color: "var(--text-secondary)",
+    color: "#64748b",
   },
   errorMessage: {
     display: "flex",
@@ -516,7 +528,7 @@ const styles = {
     alignItems: "flex-start",
     gap: "8px",
     fontSize: "13px",
-    color: "var(--text-secondary)",
+    color: "#475569",
     marginBottom: "20px",
     cursor: "pointer",
     lineHeight: "1.4",
@@ -599,7 +611,7 @@ const styles = {
   },
   footerNote: {
     fontSize: "11px",
-    color: "var(--text-tertiary)",
+    color: "#64748b",
     textAlign: "center",
     marginTop: "12px",
     lineHeight: "1.4",
