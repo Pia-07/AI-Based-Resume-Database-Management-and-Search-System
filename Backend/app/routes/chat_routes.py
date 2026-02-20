@@ -2,7 +2,13 @@
 Chat Routes
 Chatbot API endpoints for resume-based Q&A and analytics.
 Uses MongoDB for all data - NO STATIC RESPONSES, NO AWS S3.
+
+Performance: All blocking calls (MongoDB, FAISS, Gemini) are offloaded
+to a thread-pool executor so the async event loop is never blocked.
 """
+import asyncio
+from functools import partial
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -19,6 +25,15 @@ from ..services.resume_service import get_resume_content_for_context
 from ..utils.db import resume_collection, chat_collection
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+# Helper: run sync function in thread pool (keeps event loop free)
+async def _run_sync(func, *args, **kwargs):
+    """Run a blocking function in the default thread-pool executor."""
+    loop = asyncio.get_event_loop()
+    if kwargs:
+        return await loop.run_in_executor(None, partial(func, *args, **kwargs))
+    return await loop.run_in_executor(None, func, *args)
 
 
 # -----------------------------
@@ -72,15 +87,18 @@ def format_chart_data_for_llm(chart_data: dict) -> str:
 # MAIN CHAT ENDPOINT
 # -----------------------------
 @router.post("")
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     query = request.query.strip()
-    user_id = request.user_id # Note: Analytics ignores this to show global stats
+    user_id = request.user_id  # Note: Analytics ignores this to show global stats
     chat_history = request.chat_history or []
     
     print(f"📩 Chat Query: '{query}'")
     
-    intent = detect_intent(query)
-    chart_preference = detect_chart_type(query)
+    # Intent detection — CPU-bound, offload to thread pool
+    intent, chart_preference = await asyncio.gather(
+        _run_sync(detect_intent, query),
+        _run_sync(detect_chart_type, query),
+    )
     
     print(f"🧠 Intent: {intent}, Chart Pref: {chart_preference}")
 
@@ -92,22 +110,24 @@ def chat(request: ChatRequest):
     # 1️⃣ ANALYTICS & FACTS INTENTS
     if intent.startswith("analytics_"):
         data_type = intent.replace("analytics_", "")
-        # Generate chart
-        chart_data = generate_chart(chart_preference, data_type, user_id)
+        # Generate chart — MongoDB I/O, offload
+        chart_data = await _run_sync(generate_chart, chart_preference, data_type, user_id)
         # Create text context from the chart data
         context_text = format_chart_data_for_llm(chart_data)
         include_cta = False
 
     elif intent == "count_resumes":
-        count = resume_collection.count_documents({})
+        count = await _run_sync(resume_collection.count_documents, {})
         context_text = f"FACT: There are exactly {count} total resumes/candidates in the database."
         include_cta = False
         
     elif intent == "list_candidates":
-        names = list(resume_collection.find({}, {"name": 1, "_id": 0}))
+        names = await _run_sync(
+            lambda: list(resume_collection.find({}, {"name": 1, "_id": 0}))
+        )
         name_list = [n.get("name") for n in names if n.get("name")]
         if len(name_list) > 50:
-             name_list = name_list[:50] # Limit for LLM context
+             name_list = name_list[:50]  # Limit for LLM context
              context_text = f"List of Candidates (first 50): {', '.join(name_list)}..."
         else:
              context_text = f"List of All Candidates: {', '.join(name_list)}"
@@ -119,39 +139,41 @@ def chat(request: ChatRequest):
 
     else:
         # 2️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)
-        # Fetch ALL resumes
-        resumes = list(resume_collection.find({}, {
-            "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
-            "skills": 1, "experience_years": 1, "location": 1,
-            "education": 1, "experience": 1, "summary": 1, "certifications": 1
-        }))
+        # Fetch ALL resumes — MongoDB I/O, offload
+        resumes = await _run_sync(
+            lambda: list(resume_collection.find({}, {
+                "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
+                "skills": 1, "experience_years": 1, "location": 1,
+                "education": 1, "experience": 1, "summary": 1, "certifications": 1
+            }))
+        )
         
         if not resumes:
             context_text = "SYSTEM NOTE: No resumes are uploaded in the database yet."
         else:
             resume_contexts = build_resume_context(resumes)
             if resume_contexts:
-                # Build vector store
+                # Build vector store — CPU-heavy, offload
                 vector_input = [{"raw_text": ctx} for ctx in resume_contexts]
-                build_vector_store(vector_input)
+                await _run_sync(build_vector_store, vector_input)
                 
-                # Search
-                matched_chunks = search_similar(query, k=10)
+                # Search — CPU-bound, offload
+                matched_chunks = await _run_sync(search_similar, query, 10)
                 if not matched_chunks:
-                    matched_chunks = resume_contexts[:5] # Fallback
+                    matched_chunks = resume_contexts[:5]  # Fallback
                 
                 context_text = "\n\n---\n\n".join(matched_chunks)
             else:
                 context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
 
-    # 3️⃣ GENERATE ANSWER
-    # We pass the constructed context (whether analytics stats or resume chunks) to the LLM
+    # 3️⃣ GENERATE ANSWER — Network I/O (Gemini API), offload
     try:
-        reply = generate_answer(
-            context=context_text,
-            question=query,
-            chat_history=chat_history,
-            include_cta=include_cta
+        reply = await _run_sync(
+            generate_answer,
+            context_text,
+            query,
+            chat_history,
+            include_cta,
         )
     except Exception as e:
         print(f"❌ LLM Error: {e}")
@@ -168,37 +190,41 @@ def chat(request: ChatRequest):
 # -----------------------------
 
 @router.get("/history/{user_id}")
-def get_chat_history(user_id: str):
+async def get_chat_history(user_id: str):
     try:
-        chats = list(chat_collection.find({"user_id": user_id}, {"_id": 0}).sort("updated_at", -1))
+        chats = await _run_sync(
+            lambda: list(chat_collection.find({"user_id": user_id}, {"_id": 0}).sort("updated_at", -1))
+        )
         return {"chats": chats}
     except Exception as e:
         return {"chats": [], "error": str(e)}
 
 @router.post("/save")
-def save_chat(request: SaveChatRequest):
+async def save_chat(request: SaveChatRequest):
     try:
         now = datetime.utcnow().isoformat()
-        chat_collection.update_one(
-            {"user_id": request.user_id, "chat_id": request.chat_id},
-            {
-                "$set": {
-                    "title": request.title,
-                    "messages": request.messages,
-                    "updated_at": now
+        await _run_sync(
+            lambda: chat_collection.update_one(
+                {"user_id": request.user_id, "chat_id": request.chat_id},
+                {
+                    "$set": {
+                        "title": request.title,
+                        "messages": request.messages,
+                        "updated_at": now
+                    },
+                    "$setOnInsert": {"created_at": now}
                 },
-                "$setOnInsert": {"created_at": now}
-            },
-            upsert=True
+                upsert=True
+            )
         )
         return {"success": True, "chat_id": request.chat_id}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @router.delete("/{chat_id}")
-def delete_chat(chat_id: str):
+async def delete_chat(chat_id: str):
     try:
-        chat_collection.delete_one({"chat_id": chat_id})
+        await _run_sync(chat_collection.delete_one, {"chat_id": chat_id})
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}

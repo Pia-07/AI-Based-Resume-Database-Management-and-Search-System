@@ -1,11 +1,24 @@
+import asyncio
+from functools import partial
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-import uuid, json, base64, sys, requests
+import uuid, json, base64, sys
+import httpx
 
 from ..utils.db import user_collection
 from ..utils.security import verify_password, hash_password
 
 router = APIRouter(tags=["auth"])
+
+
+# Helper: run sync function in thread pool
+async def _run_sync(func, *args, **kwargs):
+    loop = asyncio.get_event_loop()
+    if kwargs:
+        return await loop.run_in_executor(None, partial(func, *args, **kwargs))
+    return await loop.run_in_executor(None, func, *args)
+
 
 class AuthRequest(BaseModel):
     email: str
@@ -15,8 +28,9 @@ class GoogleAuthRequest(BaseModel):
     token: str
 
 @router.post("/signup")
-def signup(data: AuthRequest):
-    if user_collection.find_one({"email": data.email}):
+async def signup(data: AuthRequest):
+    existing = await _run_sync(user_collection.find_one, {"email": data.email})
+    if existing:
         return {"error": "User already exists"}
 
     user = {
@@ -26,7 +40,7 @@ def signup(data: AuthRequest):
         "role": "HR",
         "login_method": "password",
     }
-    user_collection.insert_one(user)
+    await _run_sync(user_collection.insert_one, user)
 
     return {
         "message": "Signup successful",
@@ -35,8 +49,8 @@ def signup(data: AuthRequest):
     }
 
 @router.post("/login")
-def login(data: AuthRequest):
-    user = user_collection.find_one({"email": data.email})
+async def login(data: AuthRequest):
+    user = await _run_sync(user_collection.find_one, {"email": data.email})
     if not user or not verify_password(data.password, user["password_hash"]):
         return {"error": "Invalid credentials"}
 
@@ -47,10 +61,11 @@ def login(data: AuthRequest):
     }
 
 @router.post("/google")
-def google_login(data: GoogleAuthRequest):
+async def google_login(data: GoogleAuthRequest):
     """
     Handle Google OAuth login using access token.
     Fetches user info from Google's userinfo API endpoint.
+    Uses httpx.AsyncClient for non-blocking HTTP.
     """
     try:
         access_token = data.token
@@ -62,15 +77,15 @@ def google_login(data: GoogleAuthRequest):
         
         print(f"🔐 Google OAuth: Received access token (length: {len(access_token)})", file=sys.stderr)
         
-        # Call Google's userinfo API to get user data
-        # This is the correct way to use an OAuth access token
+        # Call Google's userinfo API — async, non-blocking
         userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
         headers = {"Authorization": f"Bearer {access_token}"}
         
         print(f"📡 Fetching user info from Google API...", file=sys.stderr)
         
         try:
-            response = requests.get(userinfo_url, headers=headers, timeout=10)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(userinfo_url, headers=headers, timeout=10)
             
             if response.status_code != 200:
                 print(f"❌ Google API returned status {response.status_code}: {response.text}", file=sys.stderr)
@@ -79,10 +94,10 @@ def google_login(data: GoogleAuthRequest):
             user_data = response.json()
             print(f"✅ Successfully fetched user data from Google", file=sys.stderr)
             
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             print("❌ Google API request timed out", file=sys.stderr)
             return {"error": "Google authentication timed out. Please try again."}
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             print(f"❌ Failed to connect to Google API: {e}", file=sys.stderr)
             return {"error": "Failed to connect to Google. Please check your internet connection."}
         
@@ -106,9 +121,9 @@ def google_login(data: GoogleAuthRequest):
         
         print(f"👤 Processing Google login for: {email}", file=sys.stderr)
         
-        # Check if user already exists
+        # Check if user already exists — MongoDB I/O, offload
         try:
-            existing = user_collection.find_one({"email": email})
+            existing = await _run_sync(user_collection.find_one, {"email": email})
             
             if existing:
                 print(f"✅ User found in database: {email}", file=sys.stderr)
@@ -129,7 +144,7 @@ def google_login(data: GoogleAuthRequest):
                 "role": "HR",
                 "login_method": "google",
             }
-            user_collection.insert_one(user)
+            await _run_sync(user_collection.insert_one, user)
             
             print(f"✅ New user created successfully: {email}", file=sys.stderr)
             

@@ -1,8 +1,5 @@
-from sentence_transformers import SentenceTransformer, util
+from .model_manager import model_manager
 import re
-
-# Load once
-intent_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Intent examples (THIS IS THE NLU BRAIN)
 INTENT_EXAMPLES = {
@@ -55,22 +52,22 @@ INTENT_EXAMPLES = {
     ]
 }
 
-# Precompute embeddings
+# Precompute embeddings using the shared model_manager
 intent_embeddings = {
-    intent: intent_model.encode(examples, convert_to_tensor=True)
+    intent: model_manager.encode(examples, convert_to_tensor=True)
     for intent, examples in INTENT_EXAMPLES.items()
 }
 
 
 def detect_intent(query: str, threshold=0.45):
     """Detect user intent from query. Lower threshold means more queries go to semantic search."""
-    query_embedding = intent_model.encode(query, convert_to_tensor=True)
+    query_embedding = model_manager.encode(query, convert_to_tensor=True)
 
     best_intent = "unknown"
     best_score = 0
 
     for intent, embeddings in intent_embeddings.items():
-        score = util.cos_sim(query_embedding, embeddings).max().item()
+        score = model_manager.cos_sim(query_embedding, embeddings).max().item()
         if score > best_score:
             best_score = score
             best_intent = intent

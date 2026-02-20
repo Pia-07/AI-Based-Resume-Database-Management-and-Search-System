@@ -1,14 +1,9 @@
-from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 import hashlib
 from typing import List, Dict, Optional
 
-# Load embedding model ONCE
-model = SentenceTransformer(
-    "all-MiniLM-L6-v2",
-    cache_folder="./models",
-)
+from .model_manager import model_manager
 
 # In-memory FAISS store with caching
 _chunk_texts: List[str] = []
@@ -132,7 +127,7 @@ def build_vector_store(resumes: List[Dict], force_rebuild: bool = False) -> bool
 
     # Create embeddings
     print(f"📐 Creating embeddings for {len(_chunk_texts)} chunks...")
-    embeddings = model.encode(
+    embeddings = model_manager.encode(
         _chunk_texts,
         convert_to_numpy=True,
         show_progress_bar=False,
@@ -167,7 +162,7 @@ def search_similar(query: str, k: int = 10) -> List[str]:
         return []
 
     # Create query embedding
-    query_vec = model.encode(
+    query_vec = model_manager.encode(
         [query],
         convert_to_numpy=True,
     ).astype("float32")

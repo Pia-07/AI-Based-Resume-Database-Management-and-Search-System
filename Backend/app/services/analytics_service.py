@@ -227,10 +227,18 @@ def upload_trend(user_id: Optional[str] = None, chart_type: str = "line"):
     }
 
 
-# 🌐 DYNAMIC CHART GENERATOR
+import time
+
+# Simple in-memory analytics cache (60-second TTL)
+_analytics_cache: dict = {}  # key: (data_type, chart_type) -> {"data": ..., "ts": ...}
+_CACHE_TTL = 60  # seconds
+
+
+# 🌐 DYNAMIC CHART GENERATOR (with caching)
 def generate_chart(chart_type: str, data_type: str, user_id: Optional[str] = None):
     """
     Generate any chart type for any data type.
+    Results are cached for 60 seconds to avoid redundant MongoDB queries.
     
     Args:
         chart_type: 'pie', 'bar', or 'line'
@@ -240,13 +248,29 @@ def generate_chart(chart_type: str, data_type: str, user_id: Optional[str] = Non
     Returns:
         Chart data dictionary
     """
+    cache_key = (data_type, chart_type)
+    now = time.time()
+
+    # Return cached result if fresh
+    cached = _analytics_cache.get(cache_key)
+    if cached and (now - cached["ts"]) < _CACHE_TTL:
+        print(f"⚡ Analytics cache HIT for {cache_key}")
+        return cached["data"]
+
+    # Generate fresh data
     if data_type == "skill":
-        return skill_distribution(user_id, chart_type)
+        result = skill_distribution(user_id, chart_type)
     elif data_type == "experience":
-        return experience_distribution(user_id, chart_type)
+        result = experience_distribution(user_id, chart_type)
     elif data_type == "location":
-        return location_distribution(user_id, chart_type)
+        result = location_distribution(user_id, chart_type)
     elif data_type == "trend":
-        return upload_trend(user_id, chart_type)
+        result = upload_trend(user_id, chart_type)
     else:
-        return skill_distribution(user_id, chart_type)
+        result = skill_distribution(user_id, chart_type)
+
+    # Store in cache
+    _analytics_cache[cache_key] = {"data": result, "ts": now}
+    print(f"📊 Analytics cache MISS for {cache_key} — cached for {_CACHE_TTL}s")
+
+    return result
