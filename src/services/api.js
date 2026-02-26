@@ -1,4 +1,6 @@
-const BASE_URL = "http://localhost:8000";
+// Use VITE_API_URL from environment (set in Vercel/production).
+// Falls back to localhost:8000 for local development.
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // ===========================
 // HELPER: Get user ID from localStorage

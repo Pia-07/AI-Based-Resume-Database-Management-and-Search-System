@@ -28,4 +28,15 @@ env/
 .vscode/
 .idea/
 
+# Secrets
 .env
+.env.local
+.env.production
+
+# ML Models (large files - downloaded at build time in Docker)
+models/
+
+# Uploaded files (runtime data, not source code)
+uploads/
+temp/
+Backend/temp/
