@@ -4,7 +4,7 @@ services:
     runtime: docker
     dockerfilePath: ./Backend/Dockerfile
     dockerContext: ./Backend
-    plan: free           # upgrade to starter ($7/mo) to avoid cold starts
+    plan: free           # upgrade if needed to avoid cold starts
     region: singapore    # closest to India
     healthCheckPath: /
     envVars:
@@ -17,6 +17,5 @@ services:
       - key: ENV
         value: production
       - key: FRONTEND_URL
-        sync: false      # set to your Vercel URL, e.g. https://smarthire-xyz.vercel.app
-      - key: VITE_GOOGLE_CLIENT_ID
-        sync: false      # only needed here if backend validates it
+        sync: false      # set to https://my-app-ruddy-five.vercel.app
+

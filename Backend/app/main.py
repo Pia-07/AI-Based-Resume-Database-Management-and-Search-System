@@ -70,7 +70,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        # Production: set FRONTEND_URL in Render env vars (e.g. https://smarthire.vercel.app)
+        "https://my-app-ruddy-five.vercel.app",  # Production frontend
+        # Production: set FRONTEND_URL in Render env vars
         *([os.getenv("FRONTEND_URL")] if os.getenv("FRONTEND_URL") else []),
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
