@@ -1,21 +1,22 @@
 services:
   - type: web
     name: smarthire-backend
-    runtime: docker
-    dockerfilePath: ./Backend/Dockerfile
-    dockerContext: ./Backend
-    plan: free           # upgrade if needed to avoid cold starts
-    region: singapore    # closest to India
-    healthCheckPath: /
+    env: python
+    rootDir: Backend
+    buildCommand: "./build.sh"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    region: singapore
     envVars:
       - key: MONGODB_URI
-        sync: false      # set manually in Render dashboard
+        sync: false
       - key: MONGODB_DB_NAME
         value: smarthire_db
       - key: GEMINI_API_KEY
-        sync: false      # set manually in Render dashboard
+        sync: false
       - key: ENV
         value: production
       - key: FRONTEND_URL
-        sync: false      # set to https://my-app-ruddy-five.vercel.app
-
+        value: https://my-app-ruddy-five.vercel.app
+      - key: PYTHON_VERSION
+        value: 3.10.0
