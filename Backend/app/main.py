@@ -16,13 +16,13 @@ from .routes.chat_routes import router as chat_router
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle hook."""
     # ── STARTUP ─────────────────────────────────────────────
-    print("🚀 Startup: Pre-loading models and warming caches...")
+    print("🚀 Startup: Initializing lightweight API-based services...")
 
-    # 1. Trigger SentenceTransformer load (singleton import does this)
+    # 1. Initialize model manager (now just API config, no heavy model loading)
     from .services.model_manager import model_manager  # noqa: F811
-    print(f"✅ SentenceTransformer ready")
+    print("✅ Gemini API embedding service ready")
 
-    # 2. Pre-warm FAISS index with existing resumes
+    # 2. Pre-warm vector index with existing resumes (optional, can build on first query)
     try:
         from .utils.db import resume_collection
         from .services.embedding_service import build_vector_store
@@ -42,13 +42,13 @@ async def lifespan(app: FastAPI):
             if contexts:
                 vector_input = [{"raw_text": c} for c in contexts]
                 build_vector_store(vector_input)
-                print(f"✅ FAISS index pre-warmed with {len(contexts)} resume chunks")
+                print(f"✅ Vector index pre-warmed with {len(contexts)} resume chunks")
             else:
-                print("⚠️ Resumes exist but no readable content for FAISS")
+                print("⚠️ Resumes exist but no readable content for indexing")
         else:
-            print("ℹ️ No resumes in DB yet — FAISS will build on first query")
+            print("ℹ️ No resumes in DB yet — vector index will build on first query")
     except Exception as e:
-        print(f"⚠️ FAISS pre-warm failed (non-fatal): {e}")
+        print(f"⚠️ Vector index pre-warm failed (non-fatal): {e}")
 
     print("🟢 Startup complete — ready to serve requests")
     yield
