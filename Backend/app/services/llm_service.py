@@ -119,7 +119,7 @@ CRITICAL REMINDERS:
     try:
         print(f"🤖 Calling Gemini API with {len(prompt)} char prompt...")
         response = client.models.generate_content(
-            model="models/gemini-flash-latest",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         result = response.text.strip()
@@ -130,4 +130,4 @@ CRITICAL REMINDERS:
         print(f"❌ Gemini API error: {e}")
         import traceback
         traceback.print_exc()
-        return "I apologize, but I'm unable to process your request at the moment. Please try again shortly."
+        return f"I apologize, but I encountered an API error: {str(e)}"
