@@ -13,7 +13,7 @@ import threading
 import requests
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
+GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
 
 
 class ModelManager:
@@ -44,7 +44,7 @@ class ModelManager:
         """Get embedding for a single text via Gemini API."""
         url = f"{GEMINI_EMBED_URL}?key={self._api_key}"
         payload = {
-            "model": "models/text-embedding-004",
+            "model": "models/gemini-embedding-001",
             "content": {"parts": [{"text": text[:2048]}]}  # Gemini limit
         }
         try:

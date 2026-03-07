@@ -8,7 +8,7 @@ pydantic
 numpy
 
 python-multipart
-bcrypt
+bcrypt<5
 passlib[bcrypt]
 
 requests
