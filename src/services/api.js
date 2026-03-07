@@ -1,6 +1,6 @@
 // Use VITE_API_BASE_URL from environment (set in Vercel/production).
 // In development/fallback, it uses the permanent Render backend.
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://smarthire-backend-usmd.onrender.com";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://smarthire-backend-kpe4.onrender.com";
 
 // ===========================
 // HELPER: Get user ID from localStorage
