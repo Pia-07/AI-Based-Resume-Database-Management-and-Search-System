@@ -1,23 +1,20 @@
-from passlib.context import CryptContext
-import bcrypt as _bcrypt
+import bcrypt
 
-# Force passlib to use bcrypt's __about__ to avoid version detection issues
-if not hasattr(_bcrypt, '__about__'):
-    class _About:
-        __version__ = getattr(_bcrypt, '__version__', '4.0.0')
-    _bcrypt.__about__ = _About()
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
-    # Truncate to 72 bytes (bcrypt limit) - encode first, then decode back
+    """Hash a password using bcrypt directly (no passlib dependency)."""
+    # bcrypt handles the 72-byte truncation internally
     password_bytes = password.encode('utf-8')[:72]
-    return pwd_context.hash(password_bytes.decode('utf-8', errors='ignore'))
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
+
 
 def verify_password(password: str, hashed: str) -> bool:
+    """Verify a password against a bcrypt hash."""
     try:
         password_bytes = password.encode('utf-8')[:72]
-        return pwd_context.verify(password_bytes.decode('utf-8', errors='ignore'), hashed)
+        hashed_bytes = hashed.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
     except Exception:
-        # Any bcrypt error = invalid password
         return False

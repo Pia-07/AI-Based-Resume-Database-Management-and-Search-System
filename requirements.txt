@@ -8,8 +8,7 @@ pydantic
 numpy
 
 python-multipart
-bcrypt<5
-passlib[bcrypt]
+bcrypt
 
 requests
 httpx
