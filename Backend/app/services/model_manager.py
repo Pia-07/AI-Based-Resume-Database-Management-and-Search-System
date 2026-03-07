@@ -10,11 +10,11 @@ import os
 import numpy as np
 from typing import List, Union
 import threading
-import requests
+from google import genai
+from google.genai import errors
+import time
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
-
 
 class ModelManager:
     """Thread-safe singleton that provides embeddings via Gemini API."""
@@ -36,24 +36,15 @@ class ModelManager:
         self._api_key = GEMINI_API_KEY
         if not self._api_key:
             print("⚠️ ModelManager: GEMINI_API_KEY not set! Embeddings will fail.")
+            self._client = None
         else:
-            print("✅ ModelManager: Using Gemini API for embeddings (lightweight mode)")
+            print("✅ ModelManager: Using Google GenAI SDK for embeddings (batch mode)")
+            try:
+                self._client = genai.Client(api_key=self._api_key)
+            except Exception as e:
+                print(f"⚠️ ModelManager client init error: {e}")
+                self._client = None
         self._initialized = True
-
-    def _embed_single(self, text: str) -> List[float]:
-        """Get embedding for a single text via Gemini API."""
-        url = f"{GEMINI_EMBED_URL}?key={self._api_key}"
-        payload = {
-            "model": "models/gemini-embedding-001",
-            "content": {"parts": [{"text": text[:2048]}]}  # Gemini limit
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=30)
-            resp.raise_for_status()
-            return resp.json()["embedding"]["values"]
-        except Exception as e:
-            print(f"⚠️ Gemini embedding error: {e}")
-            return [0.0] * 768  # Return zero vector as fallback
 
     def encode(
         self,
@@ -62,19 +53,48 @@ class ModelManager:
         convert_to_tensor: bool = False,
         show_progress_bar: bool = False,
     ):
-        """Encode one or more sentences using Gemini API."""
+        """Encode one or more sentences using Gemini API in batches."""
         if isinstance(sentences, str):
             sentences = [sentences]
+            
+        if not sentences:
+            return np.array([[]], dtype="float32")
 
         embeddings = []
-        for sent in sentences:
-            emb = self._embed_single(sent)
-            embeddings.append(emb)
+        
+        if not self._client:
+            print("⚠️ ModelManager: No client available, returning zeros.")
+            return np.zeros((len(sentences), 768), dtype="float32")
+
+        # Batch in chunks of 50 to avoid hitting rate limits or payload size limits
+        batch_size = 50
+        for i in range(0, len(sentences), batch_size):
+            batch = sentences[i:i+batch_size]
+            # Truncate each text to 2048 chars for safety
+            batch_texts = [text[:2048] for text in batch]
+            
+            try:
+                response = self._client.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=batch_texts
+                )
+                
+                for emb in response.embeddings:
+                    embeddings.append(emb.values)
+                    
+                # Small sleep to be nice to the rate limits if there are many batches
+                if i + batch_size < len(sentences):
+                    time.sleep(1.0)
+                    
+            except Exception as e:
+                print(f"⚠️ Gemini batch embedding error: {e}")
+                # Fallback zero vectors for this batch
+                for _ in batch:
+                    embeddings.append([0.0] * 768)
 
         result = np.array(embeddings, dtype="float32")
 
         if convert_to_tensor:
-            # Return numpy array - callers use cos_sim which now handles numpy
             return result
 
         return result
