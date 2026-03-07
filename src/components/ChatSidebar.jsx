@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
 /**
@@ -23,6 +24,12 @@ const ChatSidebar = ({
   onToggleCollapse,
 }) => {
   const [hoveredChat, setHoveredChat] = useState(null);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
 
   // Auto-save chats to localStorage
   useEffect(() => {
@@ -134,6 +141,10 @@ const ChatSidebar = ({
             <span style={styles.footerIcon}>📧</span>
             <span style={styles.footerText}>support@smarthire.ai</span>
           </div>
+          <button style={styles.logoutBtn} onClick={handleLogout}>
+            <span style={styles.footerIcon}>🚪</span>
+            <span style={styles.footerText}>Logout</span>
+          </button>
         </div>
       </aside>
 
@@ -338,6 +349,21 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  logoutBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    background: "transparent",
+    border: "none",
+    color: "#ef4444",
+    cursor: "pointer",
+    padding: "8px",
+    borderRadius: "8px",
+    transition: "background 150ms ease",
+    fontSize: "13px",
+    fontWeight: "500",
+    width: "100%",
   },
   overlay: {
     position: "fixed",

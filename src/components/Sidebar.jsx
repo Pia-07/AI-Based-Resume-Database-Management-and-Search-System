@@ -27,8 +27,11 @@ const Sidebar = () => {
         Upload Resume
       </button>
 
-      <button style={btnStyle} onClick={() => navigate("/analytics")}>
-        Analytics
+      <button style={{ ...btnStyle, color: "#ef4444", borderColor: "#ef4444", background: "transparent" }} onClick={() => {
+        localStorage.clear();
+        navigate("/login");
+      }}>
+        Logout
       </button>
     </div>
   );
