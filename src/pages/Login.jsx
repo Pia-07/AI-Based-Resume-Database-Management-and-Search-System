@@ -24,7 +24,6 @@ const Login = () => {
 
   const googleLogin = useGoogleLogin({
     flow: "implicit",
-    ux_mode: "redirect",
     onSuccess: async (tokenResponse) => {
       try {
         console.log("🔐 Google OAuth Success - Token received");
