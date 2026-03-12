@@ -138,33 +138,43 @@ async def chat(request: ChatRequest):
         include_cta = False
 
     else:
-        # 2️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)
-        # Fetch ALL resumes — MongoDB I/O, offload
-        resumes = await _run_sync(
-            lambda: list(resume_collection.find({}, {
-                "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
-                "skills": 1, "experience_years": 1, "location": 1,
-                "education": 1, "experience": 1, "summary": 1, "certifications": 1
-            }))
-        )
+        # Check if vector index is already built to avoid expensive DB fetch
+        index_stats = get_index_stats()
         
-        if not resumes:
-            context_text = "SYSTEM NOTE: No resumes are uploaded in the database yet."
-        else:
-            resume_contexts = build_resume_context(resumes)
-            if resume_contexts:
-                # Build vector store — CPU-heavy, offload
-                vector_input = [{"raw_text": ctx} for ctx in resume_contexts]
-                await _run_sync(build_vector_store, vector_input)
-                
-                # Search — CPU-bound, offload
-                matched_chunks = await _run_sync(search_similar, query, 10)
-                if not matched_chunks:
-                    matched_chunks = resume_contexts[:5]  # Fallback
-                
-                context_text = "\n\n---\n\n".join(matched_chunks)
+        if index_stats.get("chunks", 0) > 0:
+            # Index already warmly built, just search
+            matched_chunks = await _run_sync(search_similar, query, 10)
+            if not matched_chunks:
+                context_text = "SYSTEM NOTE: No specifically relevant content found."
             else:
-                context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
+                context_text = "\n\n---\n\n".join(matched_chunks)
+        else:
+            # First-time build: Fetch ALL resumes — MongoDB I/O, offload
+            resumes = await _run_sync(
+                lambda: list(resume_collection.find({}, {
+                    "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
+                    "skills": 1, "experience_years": 1, "location": 1,
+                    "education": 1, "experience": 1, "summary": 1, "certifications": 1
+                }))
+            )
+            
+            if not resumes:
+                context_text = "SYSTEM NOTE: No resumes are uploaded in the database yet."
+            else:
+                resume_contexts = build_resume_context(resumes)
+                if resume_contexts:
+                    # Build vector store — CPU-heavy, offload
+                    vector_input = [{"raw_text": ctx} for ctx in resume_contexts]
+                    await _run_sync(build_vector_store, vector_input)
+                    
+                    # Search — CPU-bound, offload
+                    matched_chunks = await _run_sync(search_similar, query, 10)
+                    if not matched_chunks:
+                        matched_chunks = resume_contexts[:5]  # Fallback
+                    
+                    context_text = "\n\n---\n\n".join(matched_chunks)
+                else:
+                    context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
 
     # 3️⃣ GENERATE ANSWER — Network I/O (Gemini API), offload
     try:

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { loginUser, loginWithGoogle } from "../services/api";
+import { loginUser, loginWithGoogle, warmUpBackend } from "../services/api";
 import Logo from "../components/Logo";
 
 const Login = () => {
@@ -13,55 +13,18 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Debug: Log rendering
-  console.log("Login component rendering...");
-  console.log("Current Origin for Google OAuth:", window.location.origin);
+  // Pre-warm backend on page load (Render free tier cold start)
+  useEffect(() => {
+    warmUpBackend();
+    // Debug: Log once on mount (not every render)
+    console.log("Login component mounted");
+    console.log("Current Origin for Google OAuth:", window.location.origin);
+  }, []);
 
-  // Google login handler - Send token to backend for processing
-  const handleGoogleLoginSuccess = async (credentialResponse) => {
-    try {
-      setError("");
-      setGoogleLoading(true);
-
-      const token = credentialResponse.credential;
-
-      // Send token to backend for validation and user creation
-      const response = await loginWithGoogle(token);
-
-      console.log("Backend response:", response);
-
-      if (response.error) {
-        setError(response.error);
-        console.error("Google login error:", response.error);
-      } else if (response.user_id) {
-        // Store user session
-        localStorage.setItem("userId", response.user_id);
-        localStorage.setItem("userEmail", response.email);
-        localStorage.setItem("userName", response.name || response.email.split('@')[0]);
-
-        // Clear chat session to show empty state on login
-        localStorage.removeItem("chatSessionStarted");
-
-        console.log("✅ Google login successful:", response.email);
-        navigate("/chatbot");
-      } else {
-        console.error("Invalid response structure:", response);
-        setError("Unexpected response from server. Check console for details.");
-      }
-    } catch (err) {
-      console.error("Google login error:", err);
-      setError("Failed to process Google login. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleGoogleLoginError = () => {
-    setError("Failed to login with Google. Please try again.");
-  };
 
   const googleLogin = useGoogleLogin({
     flow: "implicit",
+    ux_mode: "redirect",
     onSuccess: async (tokenResponse) => {
       try {
         console.log("🔐 Google OAuth Success - Token received");

@@ -12,8 +12,9 @@ import { useState, useEffect } from "react";
  * - Smooth entry animations
  * - Chart support with dark mode
  * - Proper text visibility in both themes
+ * - Retry capability for failed messages
  */
-const ChatMessage = ({ sender, text, chart, isLoading, isTiming }) => {
+const ChatMessage = ({ sender, text, chart, isLoading, isTiming, onRetry }) => {
   const isUser = sender === "user" || sender === "hr";
 
   // Detect dark mode from document
@@ -178,6 +179,21 @@ const ChatMessage = ({ sender, text, chart, isLoading, isTiming }) => {
             >
               {text}
             </ReactMarkdown>
+
+            {/* Retry Button for Failed Messages */}
+            {text && text.includes("❌ Error:") && onRetry && (
+              <button
+                onClick={onRetry}
+                style={{
+                  ...styles.retryButton,
+                  background: isDarkMode ? "#334155" : "#fee2e2",
+                  color: isDarkMode ? "#f87171" : "#b91c1c",
+                  borderColor: isDarkMode ? "#475569" : "#fca5a5",
+                }}
+              >
+                🔄 Retry Message
+              </button>
+            )}
           </div>
         )}
 
@@ -343,6 +359,19 @@ const styles = {
     borderRadius: "12px",
     overflow: "hidden",
     padding: "12px",
+  },
+  retryButton: {
+    marginTop: "12px",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    border: "1px solid",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 150ms ease",
   },
 };
 

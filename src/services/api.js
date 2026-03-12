@@ -3,6 +3,41 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://smarthire-backend-kpe4.onrender.com";
 
 // ===========================
+// BACKEND WARM-UP (Render free tier cold start)
+// ===========================
+// Silently ping the backend to wake it from sleep.
+// Call this early (on Landing/Login page load) so the server
+// is ready by the time the user clicks Login or Sign Up.
+// Retries up to 3 times with 5s intervals to cover the cold-start window.
+let _warmUpStarted = false;
+export const warmUpBackend = () => {
+  if (_warmUpStarted) return; // Only ping once per session
+  _warmUpStarted = true;
+  console.log("🔥 Warming up backend...");
+
+  const ping = (attempt) => {
+    fetch(BASE_URL + "/", { method: "GET", mode: "cors" })
+      .then((res) => {
+        if (res.ok) {
+          console.log("✅ Backend is awake");
+        } else if (attempt < 3) {
+          console.log(`⏳ Backend returned ${res.status}, retrying in 5s (attempt ${attempt}/3)...`);
+          setTimeout(() => ping(attempt + 1), 5000);
+        }
+      })
+      .catch(() => {
+        if (attempt < 3) {
+          console.log(`⏳ Backend still waking up, retrying in 5s (attempt ${attempt}/3)...`);
+          setTimeout(() => ping(attempt + 1), 5000);
+        } else {
+          console.log("⚠️ Backend warm-up failed after 3 attempts");
+        }
+      });
+  };
+  ping(1);
+};
+
+// ===========================
 // HELPER: Get user ID from localStorage
 // ===========================
 const getUserId = () => {
@@ -62,6 +97,61 @@ export const uploadResume = async (files) => {
 };
 
 // ===========================
+// HELPER: Fetch with timeout + retry
+// ===========================
+const CHAT_TIMEOUT_MS = 60000; // 60 seconds (covers Render cold start + Gemini response)
+const MAX_RETRIES = 2;
+
+async function fetchWithRetry(url, options, { timeoutMs = CHAT_TIMEOUT_MS, retries = MAX_RETRIES } = {}) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Retry on 503 (service unavailable — Render cold start) or 502 (bad gateway)
+      if ((response.status === 503 || response.status === 502) && attempt < retries) {
+        console.log(`⏳ Backend returned ${response.status}, retrying in ${(attempt + 1) * 3}s...`);
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 3000));
+        continue;
+      }
+
+      return response;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err;
+
+      if (err.name === "AbortError") {
+        if (attempt < retries) {
+          console.log(`⏱️ Request timed out, retrying (attempt ${attempt + 2}/${retries + 1})...`);
+          continue;
+        }
+        throw new Error(
+          "The request timed out. The backend may still be starting up — please wait a moment and try again."
+        );
+      }
+
+      // Network errors — retry with backoff
+      if (attempt < retries) {
+        console.log(`🔄 Network error, retrying in ${(attempt + 1) * 3}s...`);
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 3000));
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error("Request failed after retries");
+}
+
+// ===========================
 // CHATBOT - Send Message
 // ===========================
 export const sendChatMessage = async (message, chatId = null, chatHistory = []) => {
@@ -74,7 +164,7 @@ export const sendChatMessage = async (message, chatId = null, chatHistory = []) 
     history_length: chatHistory.length
   });
 
-  const response = await fetch(`${BASE_URL}/chat`, {
+  const response = await fetchWithRetry(`${BASE_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -91,7 +181,8 @@ export const sendChatMessage = async (message, chatId = null, chatHistory = []) 
   });
 
   if (!response.ok) {
-    throw new Error("Chat request failed");
+    const errText = await response.text().catch(() => "Unknown error");
+    throw new Error(`Chat request failed (${response.status}): ${errText}`);
   }
 
   return await response.json();

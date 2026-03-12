@@ -1,10 +1,16 @@
 import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { warmUpBackend } from "../services/api";
 
 const Landing = () => {
   const navigate = useNavigate();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Pre-warm backend on page load (Render free tier cold start)
+  useEffect(() => {
+    warmUpBackend();
+  }, []);
 
   // Track mouse for gradient effect
   useEffect(() => {

@@ -1,5 +1,6 @@
 import os
 from typing import List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dotenv import load_dotenv
 
 # Try to import the Google Generative AI client. If it's not available, fall back
@@ -14,6 +15,19 @@ except ModuleNotFoundError:
     client = None
     load_dotenv()
     print("⚠️ 'google-generative-ai' package not installed. Install with 'pip install google-generative-ai' and set GEMINI_API_KEY in your .env. LLM features will be disabled.")
+
+# Thread pool for timeout-guarded Gemini calls
+_llm_executor = ThreadPoolExecutor(max_workers=4)
+GEMINI_TIMEOUT_SECONDS = 30
+
+
+def _call_gemini(prompt: str) -> str:
+    """Synchronous Gemini API call (runs in thread pool)."""
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=prompt
+    )
+    return response.text.strip()
 
 
 def generate_answer(
@@ -117,14 +131,15 @@ CRITICAL REMINDERS:
         return "LLM service unavailable: please install 'google-generative-ai' and set GEMINI_API_KEY in your environment."
 
     try:
-        print(f"🤖 Calling Gemini API with {len(prompt)} char prompt...")
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
-        result = response.text.strip()
+        print(f"🤖 Calling Gemini API with {len(prompt)} char prompt (timeout: {GEMINI_TIMEOUT_SECONDS}s)...")
+        future = _llm_executor.submit(_call_gemini, prompt)
+        result = future.result(timeout=GEMINI_TIMEOUT_SECONDS)
         print(f"✅ Gemini response received: {len(result)} chars")
         return result
+
+    except FuturesTimeoutError:
+        print(f"⏱️ Gemini API timed out after {GEMINI_TIMEOUT_SECONDS}s")
+        return "I apologize, but the AI service took too long to respond. Please try again — subsequent requests are usually faster."
 
     except Exception as e:
         print(f"❌ Gemini API error: {e}")

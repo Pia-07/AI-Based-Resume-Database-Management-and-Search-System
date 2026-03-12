@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { signupUser, loginWithGoogle } from "../services/api";
+import { signupUser, loginWithGoogle, warmUpBackend } from "../services/api";
 import Logo from "../components/Logo";
 
 const Signup = () => {
@@ -15,56 +15,62 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Google login handler
-  const handleGoogleSignupSuccess = async (credentialResponse) => {
-    try {
-      setError("");
-      setGoogleLoading(true);
+  // Pre-warm backend on page load (Render free tier cold start)
+  useEffect(() => {
+    warmUpBackend();
+  }, []);
 
-      console.log("Credential Response:", credentialResponse);
-      console.log("Token:", credentialResponse.credential);
+  // Google OAuth signup handler using implicit flow
+  const googleSignup = useGoogleLogin({
+    flow: "implicit",
+    ux_mode: "redirect",
+    onSuccess: async (tokenResponse) => {
+      try {
+        console.log("🔐 Google OAuth Signup - Token received");
+        setGoogleLoading(true);
+        setError("");
 
-      if (!credentialResponse.credential) {
-        setError("Failed to get Google token");
-        return;
-      }
+        const accessToken = tokenResponse.access_token;
+        console.log("📤 Sending access token to backend (length:", accessToken?.length, ")");
 
+        const response = await loginWithGoogle(accessToken);
+        console.log("📥 Backend response:", response);
 
-      const response = await loginWithGoogle(credentialResponse.credential);
+        if (response?.error) {
+          console.error("❌ Backend returned error:", response.error);
+          setError(response.error);
+          return;
+        }
 
-      console.log("Backend response:", response);
-      console.log("Response keys:", Object.keys(response));
+        if (!response?.user_id) {
+          console.error("❌ Invalid response structure:", response);
+          setError("Unexpected response from server. Check console for details.");
+          return;
+        }
 
-      if (response.error) {
-        setError(response.error);
-      } else if (response.message) {
+        console.log("✅ Google signup successful for:", response.email);
+
         // Store user session
-        localStorage.setItem("userId", response.user_id || "");
+        localStorage.setItem("userId", response.user_id);
         localStorage.setItem("userEmail", response.email || "");
+        localStorage.setItem("userName", response.name || response.email?.split("@")[0] || "");
 
         // Clear chat session to show empty state on signup
         localStorage.removeItem("chatSessionStarted");
 
+        console.log("🚀 Redirecting to chatbot...");
         navigate("/chatbot");
-      } else {
-        console.error("Unexpected response structure:", response);
-        setError(`Unexpected response from Google signup: ${JSON.stringify(response)}`);
+      } catch (err) {
+        console.error("❌ Google signup error:", err);
+        setError(`Google signup failed: ${err.message || "Unknown error"}`);
+      } finally {
+        setGoogleLoading(false);
       }
-    } catch (err) {
-      console.error("Google signup error:", err);
-      setError("Failed to sign up with Google. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleGoogleSignupError = () => {
-    setError("Failed to sign up with Google. Please try again.");
-  };
-
-  const googleSignup = useGoogleLogin({
-    onSuccess: handleGoogleSignupSuccess,
-    onError: handleGoogleSignupError,
+    },
+    onError: (error) => {
+      console.error("❌ Google OAuth popup failed:", error);
+      setError("Google authentication failed. Please try again.");
+    },
   });
 
   // Password validation rules

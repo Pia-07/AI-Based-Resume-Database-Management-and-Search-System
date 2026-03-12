@@ -22,33 +22,40 @@ async def lifespan(app: FastAPI):
     from .services.model_manager import model_manager  # noqa: F811
     print("✅ Gemini API embedding service ready")
 
-    # 2. Pre-warm vector index with existing resumes (optional, can build on first query)
-    try:
-        from .utils.db import resume_collection
-        from .services.embedding_service import build_vector_store
-        from .services.resume_service import get_resume_content_for_context
+    # 2. Pre-warm vector index with existing resumes (non-blocking)
+    def background_prewarm(*args, **kwargs):
+        try:
+            from .utils.db import resume_collection
+            from .services.embedding_service import build_vector_store
+            from .services.resume_service import get_resume_content_for_context
 
-        resumes = list(resume_collection.find({}, {
-            "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
-            "skills": 1, "experience_years": 1, "location": 1,
-            "education": 1, "experience": 1, "summary": 1, "certifications": 1
-        }))
-        if resumes:
-            contexts = []
-            for r in resumes:
-                ctx = get_resume_content_for_context(r)
-                if ctx and len(ctx.strip()) > 10:
-                    contexts.append(ctx)
-            if contexts:
-                vector_input = [{"raw_text": c} for c in contexts]
-                build_vector_store(vector_input)
-                print(f"✅ Vector index pre-warmed with {len(contexts)} resume chunks")
+            print("⏳ Background vector index pre-warming started...")
+            resumes = list(resume_collection.find({}, {
+                "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
+                "skills": 1, "experience_years": 1, "location": 1,
+                "education": 1, "experience": 1, "summary": 1, "certifications": 1
+            }))
+            if resumes:
+                contexts = []
+                for r in resumes:
+                    ctx = get_resume_content_for_context(r)
+                    if ctx and len(ctx.strip()) > 10:
+                        contexts.append(ctx)
+                if contexts:
+                    vector_input = [{"raw_text": c} for c in contexts]
+                    build_vector_store(vector_input)
+                    print(f"✅ Vector index pre-warmed with {len(contexts)} resume chunks")
+                else:
+                    print("⚠️ Resumes exist but no readable content for indexing")
             else:
-                print("⚠️ Resumes exist but no readable content for indexing")
-        else:
-            print("ℹ️ No resumes in DB yet — vector index will build on first query")
-    except Exception as e:
-        print(f"⚠️ Vector index pre-warm failed (non-fatal): {e}")
+                print("ℹ️ No resumes in DB yet — vector index will build on first query")
+        except Exception as e:
+            print(f"⚠️ Vector index pre-warm failed (non-fatal): {e}")
+
+    # Start the pre-warming in a background thread so it doesn't block server startup
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, background_prewarm)
 
     print("🟢 Startup complete — ready to serve requests")
     yield

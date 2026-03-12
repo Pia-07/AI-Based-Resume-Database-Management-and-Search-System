@@ -9,7 +9,8 @@ import {
   sendChatMessage,
   getChatHistory,
   saveChatToBackend,
-  deleteChatFromBackend
+  deleteChatFromBackend,
+  warmUpBackend
 } from "../services/api";
 
 
@@ -45,6 +46,9 @@ const Chatbot = () => {
 
   // Load chats from backend on mount
   useEffect(() => {
+    // Ensure backend is awake (Render free tier cold start)
+    warmUpBackend();
+
     const loadChats = async () => {
       console.log("🔄 Loading chat history from backend...");
 
@@ -289,6 +293,31 @@ const Chatbot = () => {
     }
   };
 
+  const handleRetryMessage = (failedMessageId) => {
+    // Find the index of the failed assistant message
+    const failedIndex = messages.findIndex(m => m.id === failedMessageId);
+    if (failedIndex > 0) {
+      // The user message is the one immediately preceding the failed assistant message
+      const userMessage = messages[failedIndex - 1];
+      if (userMessage && userMessage.sender === "user") {
+        // Remove the failed message and the user message from state
+        const updatedMessages = messages.slice(0, failedIndex - 1);
+        setMessages(updatedMessages);
+        
+        // Populate the input with the user's message and automatically send
+        setInput(userMessage.text);
+        
+        // We use setTimeout to ensure state updates before sending
+        setTimeout(() => {
+          // A bit hacky, but the simplest way without rewriting handleSendMessage
+          // to take an explicit string argument instead of reading from state
+          const sendBtn = document.getElementById("chat-send-btn");
+          if (sendBtn) sendBtn.click();
+        }, 100);
+      }
+    }
+  };
+
   return (
     <div style={styles.container}>
       {/* Sidebar */}
@@ -331,6 +360,7 @@ const Chatbot = () => {
                   text={msg.text}
                   chart={msg.chart}
                   isLoading={msg.isLoading}
+                  onRetry={msg.text && msg.text.includes("❌ Error:") ? () => handleRetryMessage(msg.id) : undefined}
                 />
               ))}
               <div ref={messagesEndRef} />
