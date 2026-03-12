@@ -14,6 +14,18 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showServerWakingMsg, setShowServerWakingMsg] = useState(false);
+
+  // Set a timer to show "Server waking up" if loading takes too long
+  useEffect(() => {
+    let timer;
+    if (loading || googleLoading) {
+      timer = setTimeout(() => setShowServerWakingMsg(true), 3000);
+    } else {
+      setShowServerWakingMsg(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading, googleLoading]);
 
   // Pre-warm backend on page load (Render free tier cold start)
   useEffect(() => {
@@ -180,6 +192,13 @@ const Signup = () => {
             <div style={styles.errorMessage} className="animate-slideInRight">
               <span style={styles.errorIcon}>⚠</span>
               <span>{error}</span>
+            </div>
+          )}
+
+          {showServerWakingMsg && (
+            <div style={styles.wakingMessage} className="animate-pulse">
+              <span style={styles.wakingIcon}>🔥</span>
+              <span>Server is waking up from sleep (may take 30s)...</span>
             </div>
           )}
 
@@ -460,6 +479,21 @@ const styles = {
     color: "#7f1d1d",
     fontSize: "13px",
     marginBottom: "20px",
+  },
+  wakingMessage: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    background: "#fff7ed",
+    border: "1px solid #ffedd5",
+    color: "#9a3412",
+    fontSize: "13px",
+    marginBottom: "20px",
+  },
+  wakingIcon: {
+    fontSize: "16px",
   },
   errorIcon: {
     fontSize: "16px",
