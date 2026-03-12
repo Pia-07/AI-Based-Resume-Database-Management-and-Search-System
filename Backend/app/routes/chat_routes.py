@@ -169,10 +169,8 @@ async def chat(request: ChatRequest):
                     
                     # Search — CPU-bound, offload
                     matched_chunks = await _run_sync(search_similar, query, 10)
-                    if not matched_chunks:
-                        matched_chunks = resume_contexts[:5]  # Fallback
                     
-                    context_text = "\n\n---\n\n".join(matched_chunks)
+                    context_text = "\n\n---\n\n".join(matched_chunks) if matched_chunks else ""
                 else:
                     context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
 

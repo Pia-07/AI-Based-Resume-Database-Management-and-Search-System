@@ -12,7 +12,8 @@ import numpy as np
 # Intent examples (THIS IS THE NLU BRAIN)
 INTENT_EXAMPLES = {
     "greeting": [
-        "hi", "hello", "hey", "good morning", "hyy", "hi there"
+        "hi", "hello", "hey", "good morning", "hyy", "hi there",
+        "what can you do", "how can you help", "how to use this", "help me"
     ],
     "count_resumes": [
         "how many resumes do you have",
@@ -79,6 +80,12 @@ def _get_intent_embeddings():
 
 def detect_intent(query: str, threshold=0.45):
     """Detect user intent from query. Lower threshold means more queries go to semantic search."""
+    # Fast-track for greetings
+    clean_query = re.sub(r'[^\w\s]', '', query.lower().strip())
+    greetings = {"hi", "hello", "hey", "hyy", "hii", "helo", "greeting", "greetings"}
+    if clean_query in greetings or clean_query.startswith(("hi ", "hello ", "hey ")):
+        return "greeting"
+
     intent_embeddings = _get_intent_embeddings()
     query_embedding = model_manager.encode(query, convert_to_numpy=True)
 
