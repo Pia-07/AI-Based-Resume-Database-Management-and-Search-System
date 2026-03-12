@@ -23,6 +23,8 @@ const Signup = () => {
   // Google OAuth signup handler using implicit flow
   const googleSignup = useGoogleLogin({
     flow: "implicit",
+    ux_mode: "popup",
+    use_fedcm_for_prompt: false,
     onSuccess: async (tokenResponse) => {
       try {
         console.log("🔐 Google OAuth Signup - Token received");
