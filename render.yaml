@@ -17,6 +17,8 @@ services:
       - key: ENV
         value: production
       - key: FRONTEND_URL
-        sync: false      # set to your Vercel URL, e.g. https://smarthire-xyz.vercel.app
+        sync: false      # set to your Vercel URL e.g. https://smarthire-xyz.vercel.app
       - key: VITE_GOOGLE_CLIENT_ID
         sync: false      # only needed here if backend validates it
+      - key: PORT
+        value: "8000"

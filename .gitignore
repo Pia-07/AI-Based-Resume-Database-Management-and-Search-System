@@ -40,3 +40,6 @@ models/
 uploads/
 temp/
 Backend/temp/
+
+build/
+Backend/models/
