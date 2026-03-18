@@ -43,3 +43,4 @@ Backend/temp/
 
 build/
 Backend/models/
+.vercel

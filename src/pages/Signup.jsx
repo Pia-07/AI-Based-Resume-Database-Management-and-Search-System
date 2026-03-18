@@ -1,334 +1,224 @@
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useGoogleLogin } from "@react-oauth/google";
-import { signupUser, loginWithGoogle } from "../services/api";
-import Logo from "../components/Logo";
+import { useNavigate, Link } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
+import Navbar from "../components/Navbar";
+import { signupUser, googleLogin } from "../services/api";
 
 const Signup = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Google login handler
-  const handleGoogleSignupSuccess = async (credentialResponse) => {
-    try {
-      setError("");
-      setGoogleLoading(true);
-
-      console.log("Credential Response:", credentialResponse);
-      console.log("Token:", credentialResponse.credential);
-
-      if (!credentialResponse.credential) {
-        setError("Failed to get Google token");
-        return;
-      }
-
-
-      const response = await loginWithGoogle(credentialResponse.credential);
-
-      console.log("Backend response:", response);
-      console.log("Response keys:", Object.keys(response));
-
-      if (response.error) {
-        setError(response.error);
-      } else if (response.message) {
-        // Store user session
-        localStorage.setItem("userId", response.user_id || "");
-        localStorage.setItem("userEmail", response.email || "");
-
-        // Clear chat session to show empty state on signup
-        localStorage.removeItem("chatSessionStarted");
-
-        navigate("/chatbot");
-      } else {
-        console.error("Unexpected response structure:", response);
-        setError(`Unexpected response from Google signup: ${JSON.stringify(response)}`);
-      }
-    } catch (err) {
-      console.error("Google signup error:", err);
-      setError("Failed to sign up with Google. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleGoogleSignupError = () => {
-    setError("Failed to sign up with Google. Please try again.");
-  };
-
-  const googleSignup = useGoogleLogin({
-    onSuccess: handleGoogleSignupSuccess,
-    onError: handleGoogleSignupError,
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: ""
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Password validation rules
-  const passwordRules = {
-    length: password.length >= 8,
-    number: /\d/.test(password),
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const isPasswordValid = Object.values(passwordRules).every(Boolean);
-  const isPasswordMatch = password === confirmPassword && password.length > 0;
-
-  const handleSignup = async () => {
+  const handleEmailSignup = async (e) => {
+    e.preventDefault();
     setError("");
 
-    if (!email || !password || !confirmPassword) {
+    // Validation
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError("Please fill in all fields");
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    if (!isPasswordValid) {
-      setError("Password must be at least 8 characters with uppercase, lowercase, and a number");
-      return;
-    }
-
-    if (!isPasswordMatch) {
+    if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      setLoading(true);
-      const response = await signupUser(email, password);
-
-      if (response.error) {
-        setError(response.error);
-      } else if (response.message) {
-        // Store user session
-        localStorage.setItem("userEmail", email);
-
-        // Clear chat session to show empty state on first login
-        localStorage.removeItem("chatSessionStarted");
-
-        navigate("/chatbot");
+      const data = await signupUser(formData.name, formData.email, formData.password);
+      
+      if (data.error) {
+        setError(data.error);
       } else {
-        setError("Unexpected response from server");
+        // Store user data and redirect
+        localStorage.setItem("userId", data.user_id);
+        localStorage.setItem("userEmail", data.email);
+        navigate("/chatbot");
       }
     } catch (err) {
+      setError(err.message || "An error occurred. Please try again.");
       console.error("Signup error:", err);
-      setError("Failed to connect to server. Make sure backend is running on port 8000.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !loading) {
-      handleSignup();
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const data = await googleLogin(credentialResponse.credential);
+      
+      if (data.error) {
+        setError(data.error);
+      } else {
+        // Store user data and redirect
+        localStorage.setItem("userId", data.user_id);
+        localStorage.setItem("userEmail", data.email);
+        navigate("/chatbot");
+      }
+    } catch (err) {
+      setError(err.message || "Google signup failed. Please try again.");
+      console.error("Google signup error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.container}>
-      {/* Left Side - Branding */}
-      <div style={styles.brandingSide}>
-        <div style={styles.brandContent}>
-          <div style={styles.logo}>
-            <div style={styles.logoContainer}>
-              <Logo size="64px" />
-            </div>
-          </div>
-          <h1 style={styles.brandTitle}>Join SmartHire</h1>
-          <p style={styles.brandDesc}>
-            Start improving your hiring process with AI today
-          </p>
-          <div style={styles.brandFeatures}>
-            {["Instant setup", "No credit card needed", "Free trial included"].map((feature, idx) => (
-              <div key={idx} style={styles.featureItem}>
-                <span style={styles.featureCheck}>✓</span>
-                <span>{feature}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
-      <div style={styles.formSide}>
+      <style>{`
+        @keyframes slideUpFade {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
+        }
+        input::placeholder {
+          color: rgba(226, 232, 240, 0.4);
+        }
+        input:focus {
+          border-color: #6366f1 !important;
+          background: rgba(15, 23, 42, 0.8) !important;
+          box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), inset 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
+          outline: none !important;
+        }
+        button:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 15px 40px -5px rgba(99, 102, 241, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.3) !important;
+        }
+        button:active {
+          transform: translateY(-1px);
+        }
+        a:hover {
+          color: #c4b5fd;
+        }
+      `}</style>
+      <div style={styles.decorativeElements} />
+      <Navbar />
+      <div style={styles.formContainer}>
         <div style={styles.formCard}>
-          {/* Header */}
-          <div style={styles.formHeader}>
-            <h2 style={styles.formTitle}>Create Account</h2>
-            <p style={styles.formSubtitle}>
-              Join hundreds of companies using AI-powered hiring
-            </p>
+          <h1 style={styles.title}>Create Account</h1>
+          <p style={styles.subtitle}>Join SmartHire and find your perfect candidates</p>
+
+          {error && <div style={styles.errorMessage}>{error}</div>}
+
+          {/* Google OAuth */}
+          <div style={styles.googleButtonContainer}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google signup failed")}
+              theme="outline"
+              size="large"
+            />
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div style={styles.errorMessage} className="animate-slideInRight">
-              <span style={styles.errorIcon}>⚠</span>
-              <span>{error}</span>
-            </div>
-          )}
+          <div style={styles.divider}>
+            <div style={styles.dividerLine} />
+            <span>OR</span>
+            <div style={styles.dividerLine} />
+          </div>
 
-          {/* Email Field */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Email Address</label>
-            <div style={styles.inputWrapper}>
-              <span style={styles.inputIcon}>📧</span>
+          {/* Email Signup Form */}
+          <form onSubmit={handleEmailSignup}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Full Name</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="John Doe"
+                style={styles.input}
+                required
+              />
+            </div>
+
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Email</label>
               <input
                 type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 style={styles.input}
-                disabled={loading}
+                required
               />
             </div>
-          </div>
 
-          {/* Password Field */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Password</label>
-            <div style={styles.inputWrapper}>
-              <span style={styles.inputIcon}>🔐</span>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Password</label>
               <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Create a strong password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="At least 6 characters"
                 style={styles.input}
-                disabled={loading}
+                required
               />
-              <button
-                style={styles.togglePassword}
-                onClick={() => setShowPassword(!showPassword)}
-                type="button"
-              >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
             </div>
 
-            {/* Password Strength Indicator */}
-            {password && (
-              <div style={styles.passwordStrength}>
-                <div style={styles.strengthRule(passwordRules.length)}>
-                  <span>{passwordRules.length ? "✓" : "○"}</span> At least 8 characters
-                </div>
-                <div style={styles.strengthRule(passwordRules.uppercase)}>
-                  <span>{passwordRules.uppercase ? "✓" : "○"}</span> One uppercase letter
-                </div>
-                <div style={styles.strengthRule(passwordRules.lowercase)}>
-                  <span>{passwordRules.lowercase ? "✓" : "○"}</span> One lowercase letter
-                </div>
-                <div style={styles.strengthRule(passwordRules.number)}>
-                  <span>{passwordRules.number ? "✓" : "○"}</span> One number
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Confirm Password Field */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Confirm Password</label>
-            <div style={styles.inputWrapper}>
-              <span style={styles.inputIcon}>✓</span>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Confirm Password</label>
               <input
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm your password"
                 style={styles.input}
-                disabled={loading}
+                required
               />
-              <button
-                style={styles.togglePassword}
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                type="button"
-              >
-                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
             </div>
-            {confirmPassword && (
-              <div style={{
-                ...styles.matchIndicator,
-                color: isPasswordMatch ? "#10b981" : "#ef4444",
-              }}>
-                {isPasswordMatch ? "✓ Passwords match" : "✗ Passwords do not match"}
-              </div>
-            )}
-          </div>
 
-          {/* Terms & Privacy */}
-          <label style={styles.termsCheckbox}>
-            <input type="checkbox" style={styles.checkbox} />
-            I agree to the Terms of Service and Privacy Policy
-          </label>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                ...styles.button,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? "not-allowed" : "pointer"
+              }}
+            >
+              {loading ? "Creating account..." : "Sign Up"}
+            </button>
+          </form>
 
-          {/* Signup Button */}
-          <button
-            onClick={handleSignup}
-            disabled={loading || !isPasswordValid || !isPasswordMatch}
-            style={{
-              ...styles.signupButton,
-              opacity: (loading || !isPasswordValid || !isPasswordMatch) ? 0.7 : 1,
-              cursor: (loading || !isPasswordValid || !isPasswordMatch) ? "not-allowed" : "pointer",
-            }}
-          >
-            {loading ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                <span style={styles.spinner} />
-                Creating account...
-              </span>
-            ) : (
-              "Create Account"
-            )}
-          </button>
-
-          {/* Divider */}
-          <div style={styles.divider}>
-            <span style={styles.dividerText}>or</span>
-          </div>
-
-          {/* Social Signup */}
-          <button
-            onClick={() => googleSignup()}
-            disabled={loading || googleLoading}
-            style={{
-              ...styles.socialButton,
-              opacity: loading || googleLoading ? 0.7 : 1,
-              cursor: loading || googleLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            <span style={styles.socialIcon}>
-              <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                <path fill="none" d="M0 0h48v48H0z" />
-              </svg>
-            </span>
-            {googleLoading ? "Signing up..." : "Sign up with Google"}
-          </button>
-
-          {/* Login Link */}
           <p style={styles.loginLink}>
             Already have an account?{" "}
-            <a href="#" onClick={() => navigate("/login")} style={styles.loginLinkText}>
-              Sign in here
-            </a>
-          </p>
-
-          {/* Footer Note */}
-          <p style={styles.footerNote}>
-            We'll never share your information. Read our privacy policy.
+            <Link to="/login" style={styles.link}>
+              Sign in
+            </Link>
           </p>
         </div>
       </div>
@@ -338,284 +228,163 @@ const Signup = () => {
 
 const styles = {
   container: {
-    display: "flex",
     minHeight: "100vh",
-    // Richer background gradient
-    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #d1fae5 100%)",
-  },
-  brandingSide: {
-    flex: 1,
-    // Deeper green gradient for consistency with signup theme
-    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "40px",
-    color: "white",
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f3460 100%)",
+    color: "#ffffff",
     position: "relative",
-    overflow: "hidden",
+    overflow: "hidden"
   },
-  brandContent: {
-    maxWidth: "400px",
-    textAlign: "center",
+  decorativeElements: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: `
+      radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%)
+    `,
+    pointerEvents: "none",
+  },
+  formContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100vh",
+    padding: "40px 20px",
     position: "relative",
     zIndex: 1,
   },
-  logo: {
-    marginBottom: "32px",
-    display: "flex",
-    justifyContent: "center",
+  formCard: {
+    background: "rgba(30, 41, 59, 0.85)",
+    backdropFilter: "blur(20px)",
+    border: "1px solid rgba(148, 163, 184, 0.2)",
+    borderRadius: "24px",
+    padding: "56px 48px",
+    width: "100%",
+    maxWidth: "480px",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(148, 163, 184, 0.1)",
+    animation: "slideUpFade 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    position: "relative",
   },
-  logoContainer: {
-    padding: "16px",
-    background: "white",
-    borderRadius: "20px",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    display: "inline-block",
-  },
-  brandTitle: {
+  title: {
     fontSize: "36px",
     fontWeight: "800",
     marginBottom: "12px",
-    color: "white",
+    textAlign: "center",
+    color: "#ffffff",
+    background: "linear-gradient(135deg, #6366f1 0%, #a78bfa 100%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    letterSpacing: "-1px",
   },
-  brandDesc: {
+  subtitle: {
     fontSize: "16px",
-    color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: "40px",
-    lineHeight: "1.6",
-  },
-  brandFeatures: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  featureItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    fontSize: "14px",
-    color: "rgba(255, 255, 255, 0.95)",
-  },
-  featureCheck: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.2)",
-    fontSize: "14px",
-    flexShrink: 0,
-  },
-  formSide: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "40px",
-  },
-  formCard: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "var(--bg-primary)",
-    borderRadius: "16px",
-    padding: "40px",
-    boxShadow: "var(--shadow-lg)",
-    border: "1px solid #e2e8f0",
-  },
-  formHeader: {
-    marginBottom: "28px",
-  },
-  formTitle: {
-    fontSize: "28px",
-    fontWeight: "800",
-    marginBottom: "8px",
-    color: "var(--text-primary)",
-  },
-  formSubtitle: {
-    fontSize: "14px",
-    color: "#64748b",
+    color: "#cbd5e1",
+    textAlign: "center",
+    marginBottom: "36px",
+    fontWeight: "500",
+    letterSpacing: "0.3px",
   },
   errorMessage: {
+    background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%)",
+    color: "#fca5a5",
+    padding: "16px 18px",
+    borderRadius: "12px",
+    marginBottom: "28px",
+    fontSize: "15px",
+    fontWeight: "600",
+    border: "1px solid rgba(239, 68, 68, 0.3)",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    animation: "shake 0.4s ease-in-out",
+    backdropFilter: "blur(4px)",
+  },
+  googleButtonContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "28px",
+    scale: "1.05",
+    transformOrigin: "center",
+  },
+  divider: {
+    textAlign: "center",
+    color: "#94a3b8",
+    margin: "32px 0",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "1px",
+    textTransform: "uppercase",
+    position: "relative",
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    padding: "12px 16px",
-    borderRadius: "12px",
-    background: "#fee2e2",
-    border: "1px solid #fecaca",
-    color: "#7f1d1d",
-    fontSize: "13px",
-    marginBottom: "20px",
   },
-  errorIcon: {
-    fontSize: "16px",
+  dividerLine: {
+    flex: 1,
+    height: "1px",
+    background: "linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.3), transparent)",
   },
   formGroup: {
-    marginBottom: "20px",
+    marginBottom: "24px"
   },
   label: {
     display: "block",
     fontSize: "14px",
-    fontWeight: "600",
-    color: "var(--text-primary)",
-    marginBottom: "8px",
-  },
-  inputWrapper: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: "12px",
-    fontSize: "16px",
-    pointerEvents: "none",
-    opacity: 0.6,
+    fontWeight: "700",
+    marginBottom: "10px",
+    color: "#e2e8f0",
+    letterSpacing: "0.4px",
+    textTransform: "uppercase",
   },
   input: {
     width: "100%",
-    paddingLeft: "40px",
-    paddingRight: "40px",
-    height: "44px",
-    borderRadius: "10px",
-    border: "1.5px solid #e2e8f0",
-    fontSize: "14px",
-    transition: "all 150ms ease",
-    background: "var(--bg-primary)",
-  },
-  togglePassword: {
-    position: "absolute",
-    right: "12px",
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "16px",
-    padding: "4px 8px",
-    opacity: 0.6,
-    transition: "opacity 150ms ease",
-  },
-  passwordStrength: {
-    marginTop: "12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  strengthRule: (isValid) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "12px",
-    color: isValid ? "#10b981" : "var(--text-tertiary)",
-    transition: "color 150ms ease",
-  }),
-  matchIndicator: {
-    marginTop: "8px",
-    fontSize: "12px",
+    padding: "14px 18px",
+    border: "2px solid rgba(148, 163, 184, 0.2)",
+    borderRadius: "12px",
+    fontSize: "15px",
+    background: "rgba(15, 23, 42, 0.5)",
+    color: "#e2e8f0",
+    boxSizing: "border-box",
+    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
     fontWeight: "500",
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
+    backdropFilter: "blur(10px)",
   },
-  termsCheckbox: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "8px",
-    fontSize: "13px",
-    color: "#475569",
-    marginBottom: "20px",
-    cursor: "pointer",
-    lineHeight: "1.4",
-  },
-  checkbox: {
-    width: "16px",
-    height: "16px",
-    cursor: "pointer",
-    borderRadius: "4px",
-    marginTop: "2px",
-    flexShrink: 0,
-  },
-  signupButton: {
+  button: {
     width: "100%",
-    height: "44px",
-    background: "var(--primary)",
+    padding: "14px 24px",
+    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
     color: "white",
     border: "none",
-    borderRadius: "10px",
-    fontSize: "15px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 200ms ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
-  },
-  spinner: {
-    display: "inline-block",
-    width: "14px",
-    height: "14px",
-    borderRadius: "50%",
-    border: "2px solid rgba(255,255,255,0.3)",
-    borderTopColor: "white",
-    animation: "spin 0.8s linear infinite",
-  },
-  divider: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    margin: "20px 0",
-  },
-  dividerText: {
-    fontSize: "12px",
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-    fontWeight: "500",
-  },
-  socialButton: {
-    width: "100%",
-    height: "44px",
-    background: "var(--bg-secondary)",
-    color: "var(--text-primary)",
-    border: "1.5px solid #e2e8f0",
-    borderRadius: "10px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 200ms ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-  },
-  socialIcon: {
+    borderRadius: "12px",
     fontSize: "16px",
+    fontWeight: "800",
+    marginTop: "32px",
+    cursor: "pointer",
+    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    boxShadow: "0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.2)",
+    letterSpacing: "0.5px",
+    position: "relative",
+    overflow: "hidden",
   },
   loginLink: {
     textAlign: "center",
-    fontSize: "13px",
-    color: "var(--text-secondary)",
-    marginTop: "16px",
+    fontSize: "15px",
+    marginTop: "28px",
+    color: "#cbd5e1",
+    fontWeight: "500",
+    letterSpacing: "0.3px",
   },
-  loginLinkText: {
-    color: "var(--primary)",
+  link: {
+    color: "#a78bfa",
     textDecoration: "none",
-    fontWeight: "600",
-  },
-  footerNote: {
-    fontSize: "11px",
-    color: "#64748b",
-    textAlign: "center",
-    marginTop: "12px",
-    lineHeight: "1.4",
-  },
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "color 0.2s ease",
+    marginLeft: "6px",
+  }
 };
 
 export default Signup;

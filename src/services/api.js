@@ -33,6 +33,85 @@ const getUserId = () => {
 };
 
 // ===========================
+// AUTHENTICATION APIs
+// ===========================
+
+export const loginUser = async (email, password) => {
+  const response = await fetch(`${BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || "Login failed");
+  }
+
+  const data = await response.json();
+  
+  // Store user info in localStorage
+  if (data.user_id) {
+    localStorage.setItem("userId", data.user_id);
+    localStorage.setItem("userEmail", data.email);
+  }
+  
+  return data;
+};
+
+export const signupUser = async (name, email, password) => {
+  const response = await fetch(`${BASE_URL}/auth/signup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || "Signup failed");
+  }
+
+  const data = await response.json();
+  
+  // Store user info in localStorage
+  if (data.user_id) {
+    localStorage.setItem("userId", data.user_id);
+    localStorage.setItem("userEmail", data.email);
+  }
+  
+  return data;
+};
+
+export const googleLogin = async (token) => {
+  const response = await fetch(`${BASE_URL}/auth/google`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || "Google login failed");
+  }
+
+  const data = await response.json();
+  
+  // Store user info in localStorage
+  if (data.user_id) {
+    localStorage.setItem("userId", data.user_id);
+    localStorage.setItem("userEmail", data.email);
+  }
+  
+  return data;
+};
+
+// ===========================
 // RESUME UPLOAD API
 // ===========================
 export const uploadResume = async (files) => {

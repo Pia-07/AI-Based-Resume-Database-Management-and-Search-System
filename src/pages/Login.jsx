@@ -1,599 +1,356 @@
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useGoogleLogin } from "@react-oauth/google";
-import { loginUser, loginWithGoogle } from "../services/api";
-import Logo from "../components/Logo";
+import { useNavigate, Link } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
+import Navbar from "../components/Navbar";
+import { loginUser, googleLogin } from "../services/api";
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Debug: Log rendering
-  console.log("Login component rendering...");
-  console.log("Current Origin for Google OAuth:", window.location.origin);
-
-  // Google login handler - Send token to backend for processing
-  const handleGoogleLoginSuccess = async (credentialResponse) => {
-    try {
-      setError("");
-      setGoogleLoading(true);
-
-      const token = credentialResponse.credential;
-
-      // Send token to backend for validation and user creation
-      const response = await loginWithGoogle(token);
-
-      console.log("Backend response:", response);
-
-      if (response.error) {
-        setError(response.error);
-        console.error("Google login error:", response.error);
-      } else if (response.user_id) {
-        // Store user session
-        localStorage.setItem("userId", response.user_id);
-        localStorage.setItem("userEmail", response.email);
-        localStorage.setItem("userName", response.name || response.email.split('@')[0]);
-
-        // Clear chat session to show empty state on login
-        localStorage.removeItem("chatSessionStarted");
-
-        console.log("✅ Google login successful:", response.email);
-        navigate("/chatbot");
-      } else {
-        console.error("Invalid response structure:", response);
-        setError("Unexpected response from server. Check console for details.");
-      }
-    } catch (err) {
-      console.error("Google login error:", err);
-      setError("Failed to process Google login. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleGoogleLoginError = () => {
-    setError("Failed to login with Google. Please try again.");
-  };
-
-  const googleLogin = useGoogleLogin({
-    flow: "implicit",
-    onSuccess: async (tokenResponse) => {
-      try {
-        console.log("🔐 Google OAuth Success - Token received");
-        setGoogleLoading(true);
-        setError("");
-
-        // Access token from Google OAuth implicit flow
-        const accessToken = tokenResponse.access_token;
-        console.log("📤 Sending access token to backend (length:", accessToken?.length, ")");
-
-        const response = await loginWithGoogle(accessToken);
-        console.log("📥 Backend response:", response);
-
-        if (response?.error) {
-          console.error("❌ Backend returned error:", response.error);
-          setError(response.error);
-          return;
-        }
-
-        if (!response?.user_id) {
-          console.error("❌ Invalid response structure:", response);
-          setError("Unexpected response from server. Check console for details.");
-          return;
-        }
-
-        console.log("✅ Google login successful for:", response.email);
-
-        localStorage.setItem("userId", response.user_id);
-        localStorage.setItem("userEmail", response.email);
-        localStorage.setItem(
-          "userName",
-          response.name || response.email?.split("@")[0]
-        );
-
-        localStorage.removeItem("chatSessionStarted");
-        console.log("🚀 Redirecting to chatbot...");
-        navigate("/chatbot");
-      } catch (err) {
-        console.error("❌ Google login error:", err);
-        setError(`Google login failed: ${err.message || "Unknown error"}`);
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    onError: (error) => {
-      console.error("❌ Google OAuth popup failed:", error);
-      setError("Google authentication failed. Please try again.");
-    },
-  });
-
-
-  const handleLogin = async () => {
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
     setError("");
-
-    if (!email || !password) {
-      setError("Please fill in all fields");
-      return;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
+    setLoading(true);
 
     try {
-      setLoading(true);
-      const response = await loginUser(email, password);
-
-      if (response.error) {
-        setError(response.error);
-      } else if (response.message) {
-        // Store user session
-        localStorage.setItem("userId", response.user_id || "");
-        localStorage.setItem("userEmail", email);
-
-        // Clear chat session to show empty state on next login
-        localStorage.removeItem("chatSessionStarted");
-
-        navigate("/chatbot");
+      const data = await loginUser(email, password);
+      
+      if (data.error) {
+        setError(data.error);
       } else {
-        setError("Unexpected response from server");
+        // Store user data and redirect
+        localStorage.setItem("userId", data.user_id);
+        localStorage.setItem("userEmail", data.email);
+        navigate("/chatbot");
       }
     } catch (err) {
+      setError(err.message || "An error occurred. Please try again.");
       console.error("Login error:", err);
-      setError("Failed to connect to server. Make sure backend is running on port 8000.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !loading) {
-      handleLogin();
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const data = await googleLogin(credentialResponse.credential);
+      
+      if (data.error) {
+        setError(data.error);
+      } else {
+        // Store user data and redirect
+        localStorage.setItem("userId", data.user_id);
+        localStorage.setItem("userEmail", data.email);
+        navigate("/chatbot");
+      }
+    } catch (err) {
+      setError(err.message || "Google login failed. Please try again.");
+      console.error("Google login error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.container}>
-      {/* Left Side - Branding */}
-      <div style={styles.brandingSide}>
-        <div style={styles.brandContent}>
-          <div style={styles.logo}>
-            <div style={styles.logoContainer}>
-              <Logo size="64px" />
-            </div>
-          </div>
-          <h1 style={styles.brandTitle}>SmartHire</h1>
-          <p style={styles.brandDesc}>
-            AI-powered resume analysis and intelligent hiring
-          </p>
-          <div style={styles.brandFeatures}>
-            {["Fast candidate matching", "AI-powered insights", "Smart search"].map((feature, idx) => (
-              <div key={idx} style={styles.featureItem}>
-                <span style={styles.featureCheck}>✓</span>
-                <span>{feature}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
-      <div style={styles.formSide}>
+      <style>{`
+        @keyframes slideUpFade {
+          from {
+            opacity: 0;
+            transform: translateY(40px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
+        }
+        input::placeholder {
+          color: rgba(226, 232, 240, 0.4);
+        }
+        input:focus {
+          border-color: #6366f1 !important;
+          background: rgba(15, 23, 42, 0.8) !important;
+          box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15), inset 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
+          outline: none !important;
+        }
+        button:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 15px 40px -5px rgba(99, 102, 241, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.3) !important;
+        }
+        button:active {
+          transform: translateY(-1px);
+        }
+        a:hover {
+          color: #c4b5fd;
+        }
+      `}</style>
+      <div style={styles.decorativeElements} />
+      <Navbar />
+      <div style={styles.formContainer}>
         <div style={styles.formCard}>
-          {/* Header */}
-          <div style={styles.formHeader}>
-            <h2 style={styles.formTitle}>Welcome Back</h2>
-            <p style={styles.formSubtitle}>
-              Sign in to access your AI hiring assistant
-            </p>
+          <h1 style={styles.title}>Welcome Back</h1>
+          <p style={styles.subtitle}>Sign in to access SmartHire</p>
+
+          {error && <div style={styles.errorMessage}>{error}</div>}
+
+          {/* Google OAuth */}
+          <div style={styles.googleButtonContainer}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google login failed")}
+              theme="outline"
+              size="large"
+            />
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div style={styles.errorMessage} className="animate-slideInRight">
-              <span style={styles.errorIcon}>⚠</span>
-              <span>{error}</span>
-            </div>
-          )}
+          <div style={styles.divider}>
+            <div style={styles.dividerLine} />
+            <span>OR</span>
+            <div style={styles.dividerLine} />
+          </div>
 
-          {/* Form Fields */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Email Address</label>
-            <div style={styles.inputWrapper}>
-              <span style={styles.inputIcon}>📧</span>
+          {/* Email Login Form */}
+          <form onSubmit={handleEmailLogin}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Email</label>
               <input
                 type="email"
-                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={handleKeyDown}
+                placeholder="you@example.com"
                 style={styles.input}
-                disabled={loading}
+                required
               />
             </div>
-          </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Password</label>
-            <div style={styles.inputWrapper}>
-              <span style={styles.inputIcon}>🔐</span>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Password</label>
               <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
+                placeholder="Enter your password"
                 style={styles.input}
-                disabled={loading}
+                required
               />
-              <button
-                style={styles.togglePassword}
-                onClick={() => setShowPassword(!showPassword)}
-                type="button"
-              >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
-              </button>
             </div>
-          </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div style={styles.checkboxRow}>
-            <label style={styles.checkboxLabel}>
-              <input type="checkbox" style={styles.checkbox} />
-              Remember me
-            </label>
-            <a href="#" style={styles.forgotLink}>Forgot password?</a>
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                ...styles.button,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? "not-allowed" : "pointer"
+              }}
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
 
-          {/* Login Button */}
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            style={{
-              ...styles.loginButton,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
-          >
-            {loading ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                <span style={styles.spinner} />
-                Signing in...
-              </span>
-            ) : (
-              "Sign In"
-            )}
-          </button>
-
-          {/* Divider */}
-          <div style={styles.divider}>
-            <span style={styles.dividerText}>or continue with</span>
-          </div>
-
-          {/* Google OAuth Login */}
-          <button
-            onClick={() => googleLogin()}
-            disabled={googleLoading || loading}
-            style={{
-              ...styles.socialButton,
-              opacity: googleLoading || loading ? 0.7 : 1,
-              cursor: googleLoading || loading ? "not-allowed" : "pointer",
-            }}
-          >
-            <span style={styles.socialIcon}>
-              <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                <path fill="none" d="M0 0h48v48H0z" />
-              </svg>
-            </span>
-            {googleLoading ? "Signing in..." : "Continue with Google"}
-          </button>
-
-
-
-
-          {/* Sign Up Link */}
           <p style={styles.signupLink}>
             Don't have an account?{" "}
-            <a href="#" onClick={() => navigate("/signup")} style={styles.signupLinkText}>
-              Create one now
-            </a>
-          </p>
-
-          {/* Footer Note */}
-          <p style={styles.footerNote}>
-            By signing in, you agree to our Terms of Service and Privacy Policy
+            <Link to="/signup" style={styles.link}>
+              Sign up
+            </Link>
           </p>
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 
 const styles = {
   container: {
-    display: "flex",
     minHeight: "100vh",
-    // Richer background gradient
-    background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%)",
-  },
-  brandingSide: {
-    flex: 1,
-    // Deeper, more premium gradient for branding
-    background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "40px",
-    color: "white",
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f3460 100%)",
+    color: "var(--text-primary, #ffffff)",
     position: "relative",
-    overflow: "hidden",
+    overflow: "hidden"
   },
-  brandContent: {
-    maxWidth: "400px",
-    textAlign: "center",
+  decorativeElements: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: `
+      radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%)
+    `,
+    pointerEvents: "none",
+  },
+  formContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100vh",
+    padding: "40px 20px",
     position: "relative",
     zIndex: 1,
   },
-  logo: {
-    marginBottom: "32px",
-    display: "flex",
-    justifyContent: "center",
+  formCard: {
+    background: "rgba(30, 41, 59, 0.85)",
+    backdropFilter: "blur(20px)",
+    border: "1px solid rgba(148, 163, 184, 0.2)",
+    borderRadius: "24px",
+    padding: "56px 48px",
+    width: "100%",
+    maxWidth: "480px",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25), inset 0 1px 0 0 rgba(148, 163, 184, 0.1)",
+    animation: "slideUpFade 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    position: "relative",
   },
-  logoContainer: {
-    padding: "16px",
-    background: "white",
-    borderRadius: "20px",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+  formCardGradientBorder: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: "24px",
+    padding: "1px",
+    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%)",
+    pointerEvents: "none",
+    zIndex: -1,
   },
-  logoText: {
-    display: "inline-block",
-  },
-  brandTitle: {
+  title: {
     fontSize: "36px",
     fontWeight: "800",
     marginBottom: "12px",
-    color: "white",
+    textAlign: "center",
+    color: "#ffffff",
+    background: "linear-gradient(135deg, #6366f1 0%, #a78bfa 100%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    letterSpacing: "-1px",
   },
-  brandDesc: {
+  subtitle: {
     fontSize: "16px",
-    color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: "40px",
-    lineHeight: "1.6",
-    textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-  },
-  brandFeatures: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  featureItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    fontSize: "14px",
-    color: "rgba(255, 255, 255, 0.95)",
-    textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-  },
-  featureCheck: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.2)",
-    fontSize: "14px",
-    flexShrink: 0,
-  },
-  formSide: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "40px",
-  },
-  formCard: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "var(--bg-primary)",
-    borderRadius: "16px",
-    padding: "40px",
-    boxShadow: "var(--shadow-lg)",
-    border: "1px solid #e2e8f0",
-  },
-  formHeader: {
-    marginBottom: "28px",
-  },
-  formTitle: {
-    fontSize: "28px",
-    fontWeight: "800",
-    marginBottom: "8px",
-    color: "var(--text-primary)",
-  },
-  formSubtitle: {
-    fontSize: "14px",
-    color: "#64748b", // Slate-500 for better visibility than standard secondary
+    color: "#cbd5e1",
+    textAlign: "center",
+    marginBottom: "36px",
+    fontWeight: "500",
+    letterSpacing: "0.3px",
   },
   errorMessage: {
+    background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%)",
+    color: "#fca5a5",
+    padding: "16px 18px",
+    borderRadius: "12px",
+    marginBottom: "28px",
+    fontSize: "15px",
+    fontWeight: "600",
+    border: "1px solid rgba(239, 68, 68, 0.3)",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    animation: "shake 0.4s ease-in-out",
+    backdropFilter: "blur(4px)",
+  },
+  googleButtonContainer: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "28px",
+    scale: "1.05",
+    transformOrigin: "center",
+  },
+  divider: {
+    textAlign: "center",
+    color: "#94a3b8",
+    margin: "32px 0",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "1px",
+    textTransform: "uppercase",
+    position: "relative",
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    padding: "12px 16px",
-    borderRadius: "12px",
-    background: "#fee2e2",
-    border: "1px solid #fecaca",
-    color: "#7f1d1d",
-    fontSize: "13px",
-    marginBottom: "20px",
   },
-  errorIcon: {
-    fontSize: "16px",
+  dividerLine: {
+    flex: 1,
+    height: "1px",
+    background: "linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.3), transparent)",
   },
   formGroup: {
-    marginBottom: "20px",
+    marginBottom: "24px",
   },
   label: {
     display: "block",
     fontSize: "14px",
-    fontWeight: "600",
-    color: "var(--text-primary)",
-    marginBottom: "8px",
-  },
-  inputWrapper: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: "12px",
-    fontSize: "16px",
-    pointerEvents: "none",
-    opacity: 0.6,
+    fontWeight: "700",
+    marginBottom: "10px",
+    color: "#e2e8f0",
+    letterSpacing: "0.4px",
+    textTransform: "uppercase",
   },
   input: {
     width: "100%",
-    paddingLeft: "40px",
-    paddingRight: "40px",
-    height: "44px",
-    borderRadius: "10px",
-    border: "1.5px solid #e2e8f0",
-    fontSize: "14px",
-    transition: "all 150ms ease",
-    background: "var(--bg-primary)",
-  },
-  togglePassword: {
-    position: "absolute",
-    right: "12px",
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "16px",
-    padding: "4px 8px",
-    opacity: 0.6,
-    transition: "opacity 150ms ease",
-  },
-  checkboxRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "20px",
-    fontSize: "13px",
-  },
-  checkboxLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    cursor: "pointer",
-    color: "#475569", // Slate-600 for better visibility
-  },
-  checkbox: {
-    width: "16px",
-    height: "16px",
-    cursor: "pointer",
-    borderRadius: "4px",
-  },
-  forgotLink: {
-    color: "var(--primary)",
-    textDecoration: "none",
-    fontSize: "13px",
+    padding: "14px 18px",
+    border: "2px solid rgba(148, 163, 184, 0.2)",
+    borderRadius: "12px",
+    fontSize: "15px",
+    background: "rgba(15, 23, 42, 0.5)",
+    color: "#e2e8f0",
+    boxSizing: "border-box",
+    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
     fontWeight: "500",
+    backdropFilter: "blur(10px)",
   },
-  loginButton: {
+  inputPlaceholder: {
+    opacity: 0.5,
+  },
+  button: {
     width: "100%",
-    height: "44px",
-    background: "var(--primary)",
+    padding: "14px 24px",
+    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
     color: "white",
     border: "none",
-    borderRadius: "10px",
-    fontSize: "15px",
-    fontWeight: "600",
+    borderRadius: "12px",
+    fontSize: "16px",
+    fontWeight: "800",
+    marginTop: "32px",
     cursor: "pointer",
-    transition: "all 200ms ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
-  },
-  spinner: {
-    display: "inline-block",
-    width: "14px",
-    height: "14px",
-    borderRadius: "50%",
-    border: "2px solid rgba(255,255,255,0.3)",
-    borderTopColor: "white",
-    animation: "spin 0.8s linear infinite",
-  },
-  divider: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    margin: "20px 0",
-  },
-  dividerText: {
-    fontSize: "12px",
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
+    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    boxShadow: "0 10px 25px -5px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.2)",
     letterSpacing: "0.5px",
-    fontWeight: "500",
+    position: "relative",
+    overflow: "hidden",
   },
-  socialButton: {
-    width: "100%",
-    height: "44px",
-    background: "var(--bg-secondary)",
-    color: "var(--text-primary)",
-    border: "1.5px solid #e2e8f0",
-    borderRadius: "10px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "all 200ms ease",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-  },
-  socialIcon: {
-    fontSize: "18px",
-    display: "flex",
-    alignItems: "center",
+  buttonHover: {
+    transform: "translateY(-3px)",
+    boxShadow: "0 15px 40px -5px rgba(99, 102, 241, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.3)",
   },
   signupLink: {
     textAlign: "center",
-    fontSize: "13px",
-    color: "var(--text-secondary)",
-    marginTop: "16px",
+    fontSize: "15px",
+    marginTop: "28px",
+    color: "#cbd5e1",
+    fontWeight: "500",
+    letterSpacing: "0.3px",
   },
-  signupLinkText: {
-    color: "var(--primary)",
+  link: {
+    color: "#a78bfa",
     textDecoration: "none",
-    fontWeight: "600",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "color 0.2s ease",
+    marginLeft: "6px",
+    position: "relative",
   },
-  footerNote: {
-    fontSize: "11px",
-    color: "#64748b",
-    textAlign: "center",
-    marginTop: "12px",
-    lineHeight: "1.4",
-  },
+  linkHover: {
+    color: "#c4b5fd",
+  }
 };
 
 export default Login;

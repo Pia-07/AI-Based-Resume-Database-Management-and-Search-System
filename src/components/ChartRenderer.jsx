@@ -101,9 +101,11 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
       {
         label: chart.title || "Data",
         data: chart.values || [],
-        backgroundColor: chart.type === "pie" ? colors : colors.map(c => c + "CC"),
-        borderColor: chart.type === "line" ? colors[0] : borderColors,
-        borderWidth: chart.type === "line" ? 3 : 2,
+        backgroundColor: chart.type === "pie" ? colors : colors.map(c => c + "E6"),
+        borderColor: chart.type === "line" ? colors[0] : "transparent",
+        borderWidth: chart.type === "line" ? 3 : 0,
+        borderRadius: chart.type === "bar" ? 8 : 0,
+        borderSkipped: false,
         fill: chart.type === "line" ? {
           target: 'origin',
           above: colors[0] + '20',
@@ -125,27 +127,46 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
       x: {
         type: "category",
         display: true,
-        ticks: {
-          font: { size: 11, weight: "500" },
+        title: {
+          display: chart.type === "bar" && chart.labels.length > 6 ? true : false,
+          text: chart.type === "bar" && chart.labels.length > 6 ? "Count" : "",
+          font: { size: 14, weight: "bold" },
           color: textColor,
-          maxRotation: 45,
+          padding: 15,
+        },
+        ticks: {
+          font: { size: 12, weight: "500" },
+          color: textColor,
+          maxRotation: chart.type === "bar" && chart.labels.length > 6 ? 0 : 45,
           minRotation: 0,
+          padding: 10,
         },
         grid: {
           display: chart.type === "line",
           color: gridColor,
+          drawBorder: false,
         },
+        offset: true,
       },
       y: {
         beginAtZero: true,
         display: true,
-        ticks: {
-          font: { size: 11, weight: "500" },
+        title: {
+          display: chart.type === "bar" && chart.labels.length > 6 ? true : false,
+          text: chart.type === "bar" && chart.labels.length > 6 ? "Locations" : "",
+          font: { size: 14, weight: "bold" },
           color: textColor,
-          precision: 0,  // Only show whole numbers
+          padding: 15,
+        },
+        ticks: {
+          font: { size: 12, weight: "500" },
+          color: textColor,
+          precision: 0,
+          padding: 10,
         },
         grid: {
           color: gridColor,
+          drawBorder: false,
         },
       },
     } : undefined,
@@ -153,22 +174,23 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
       legend: {
         position: "bottom",
         labels: {
-          font: { size: 12, weight: "600" },
+          font: { size: 13, weight: "600" },
           color: textColor,
-          padding: 15,
+          padding: 20,
           usePointStyle: true,
-          boxWidth: 12,
+          boxWidth: 14,
+          boxHeight: 14,
         },
       },
       datalabels: {
         display: true,
         color: textColor,
-        anchor: 'end',
-        align: 'top',
-        offset: 4,
+        anchor: chart.type === "bar" && chart.labels.length > 6 ? "end" : "end",
+        align: chart.type === "bar" && chart.labels.length > 6 ? "right" : "top",
+        offset: chart.type === "bar" && chart.labels.length > 6 ? 12 : 6,
         font: {
           weight: 'bold',
-          size: 12
+          size: 13
         },
         formatter: (value) => Math.round(value),
       },
@@ -176,25 +198,27 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
         backgroundColor: isDarkMode ? "rgba(30, 41, 59, 0.95)" : "rgba(15, 23, 42, 0.9)",
         titleColor: "#fff",
         bodyColor: "#fff",
-        padding: 12,
+        padding: 14,
         titleFont: { size: 14, weight: "bold" },
         bodyFont: { size: 13 },
-        cornerRadius: 8,
+        cornerRadius: 10,
         displayColors: true,
+        borderColor: isDarkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(71, 85, 105, 0.2)",
+        borderWidth: 1,
       },
     },
     maintainAspectRatio: false,
     responsive: true,
     layout: {
       padding: {
-        top: 20,
-        bottom: 20,
-        left: 20,
-        right: 20,
+        top: 30,
+        bottom: 30,
+        left: 30,
+        right: 30,
       },
     },
     animation: {
-      duration: 750,
+      duration: 800,
       easing: 'easeInOutQuart',
     },
   };
@@ -226,20 +250,22 @@ const styles = {
   chartOuterContainer: {
     height: "auto",
     width: "100%",
-    padding: "20px",
+    padding: "28px",
     border: "1px solid #e2e8f0",
-    borderRadius: "12px",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    borderRadius: "16px",
+    boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.04)",
+    background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
   },
   chartTitle: {
-    fontSize: "16px",
-    fontWeight: "600",
-    marginBottom: "16px",
+    fontSize: "18px",
+    fontWeight: "700",
+    marginBottom: "20px",
     textAlign: "center",
+    letterSpacing: "-0.5px",
   },
   chartInnerContainer: {
     position: "relative",
-    height: "400px",
+    height: "450px",
     width: "100%",
   },
   errorContainer: {
