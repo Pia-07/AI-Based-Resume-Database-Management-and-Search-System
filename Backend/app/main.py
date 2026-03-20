@@ -68,6 +68,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         # Production: set FRONTEND_URL in Render env vars (e.g. https://smarthire.vercel.app)
@@ -86,4 +88,8 @@ app.include_router(resume_router)
 @app.get("/")
 def root():
     return {"status": "API running"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "message": "Backend is active"}
 

@@ -1,7 +1,7 @@
+import React, { useState, useEffect, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ChartRenderer from "./ChartRenderer";
-import { useState, useEffect } from "react";
 
 /**
  * ChatMessage - Premium message bubble component for AI and user messages
@@ -13,36 +13,25 @@ import { useState, useEffect } from "react";
  * - Chart support with dark mode
  * - Proper text visibility in both themes
  */
-const ChatMessage = ({ sender, text, chart, isLoading, isTiming }) => {
+const ChatMessage = memo(({ sender, text, chart, isLoading, isTiming }) => {
   const isUser = sender === "user" || sender === "hr";
 
-  // Detect dark mode from document
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Use a simpler theme detection that doesn't create thousands of observers
+  const [isDarkMode, setIsDarkMode] = useState(
+    document.documentElement.getAttribute("data-theme") === "dark"
+  );
 
   useEffect(() => {
-    const checkTheme = () => {
+    const handler = () => {
       const theme = document.documentElement.getAttribute("data-theme");
-      setIsDarkMode(theme === "dark" ||
-        (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches));
+      setIsDarkMode(theme === "dark");
     };
 
-    checkTheme();
+    // Watch for theme changes on the root element
+    const observer = new MutationObserver(handler);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-    // Watch for theme changes
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"]
-    });
-
-    // Also listen for system preference changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", checkTheme);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener("change", checkTheme);
-    };
+    return () => observer.disconnect();
   }, []);
 
   // Dynamic styles based on theme

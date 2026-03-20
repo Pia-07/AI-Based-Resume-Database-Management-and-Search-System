@@ -16,9 +16,9 @@ const Navbar = () => {
 
         {/* Navigation Links */}
         <div style={styles.navLinks}>
-          <a href="#features" style={styles.navLink}>Features</a>
-          <a href="#about" style={styles.navLink}>About</a>
-          <a href="#contact" style={styles.navLink}>Contact</a>
+          <Link to="/features" style={styles.navLink}>Features</Link>
+          <Link to="/about" style={styles.navLink}>About</Link>
+          <Link to="/contact" style={styles.navLink}>Contact</Link>
         </div>
 
         {/* Action Buttons */}
@@ -46,7 +46,7 @@ const styles = {
     right: 0,
     height: "70px",
     background: "var(--bg-primary)",
-    border: "1px solid var(--border-color)",
+    border: "1px solid var(--card-border)",
     backdropFilter: "blur(10px)",
     zIndex: 1000,
     display: "flex",
@@ -104,7 +104,7 @@ const styles = {
   loginBtn: {
     padding: "10px 20px",
     borderRadius: "10px",
-    border: "1.5px solid var(--border-color)",
+    border: "1.5px solid var(--card-border)",
     textDecoration: "none",
     color: "var(--text-primary)",
     fontWeight: "600",

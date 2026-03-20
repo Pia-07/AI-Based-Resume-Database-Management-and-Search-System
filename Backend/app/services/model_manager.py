@@ -6,10 +6,20 @@ and intent_service. This halves RAM usage (~400 MB saved) and
 eliminates duplicate cold-start time.
 """
 
-from sentence_transformers import SentenceTransformer, util
-import numpy as np
-from typing import List, Union
+import os
+import sys
 import threading
+import numpy as np
+import logging
+from typing import List, Union
+
+# Silence HuggingFace and Transformers noise
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+
+from sentence_transformers import SentenceTransformer, util
 
 
 class ModelManager:

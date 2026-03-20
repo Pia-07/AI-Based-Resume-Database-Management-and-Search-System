@@ -61,7 +61,7 @@ export const loginUser = async (email, password) => {
   return data;
 };
 
-export const signupUser = async (name, email, password) => {
+export const signupUser = async (email, password) => {
   const response = await fetch(`${BASE_URL}/auth/signup`, {
     method: "POST",
     headers: {
@@ -109,6 +109,20 @@ export const googleLogin = async (token) => {
   }
   
   return data;
+};
+
+// Alias used by Login.jsx and Signup.jsx
+export const loginWithGoogle = googleLogin;
+
+// ===========================
+// WARM-UP: Wake Render backend from sleep
+// ===========================
+export const warmUpBackend = async () => {
+  try {
+    await fetch(`${BASE_URL}/health`, { method: "GET" });
+  } catch {
+    // Silently fail — backend may still be sleeping
+  }
 };
 
 // ===========================
@@ -280,37 +294,4 @@ export const deleteChatFromBackend = async (chatId) => {
     console.error("❌ Error deleting chat:", error);
     return { success: false };
   }
-};
-
-// ===========================
-// AUTH APIs
-// ===========================
-export const signupUser = async (email, password) => {
-  const response = await fetch(`${BASE_URL}/auth/signup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  return await response.json();
-};
-
-export const loginUser = async (email, password) => {
-  const response = await fetch(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  return await response.json();
-};
-
-export const loginWithGoogle = async (credential) => {
-  const response = await fetch(`${BASE_URL}/auth/google`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: credential }),
-  });
-
-  return await response.json();
 };

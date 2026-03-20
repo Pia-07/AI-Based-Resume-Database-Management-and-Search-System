@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import {
   Pie,
   Bar,
@@ -33,8 +34,13 @@ ChartJS.register(
   ChartDataLabels
 );
 
-const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
-  console.log("🎨 ChartRenderer received:", chart);
+const ChartRenderer = memo(({ data: chart, isDarkMode = false }) => {
+  // Only log if we have actual new data to render
+  React.useEffect(() => {
+    if (chart) {
+      console.log(`🎨 ChartRenderer rendering: ${chart.title || 'Untitled'} (${chart.type})`);
+    }
+  }, [chart]);
 
   if (!chart) {
     console.warn("⚠️ No chart data provided to ChartRenderer");
@@ -244,7 +250,7 @@ const ChartRenderer = ({ data: chart, isDarkMode = false }) => {
       </div>
     </div>
   );
-};
+});
 
 const styles = {
   chartOuterContainer: {
