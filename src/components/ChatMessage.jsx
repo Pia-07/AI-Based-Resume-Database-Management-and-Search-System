@@ -191,7 +191,7 @@ const ChatMessage = memo(({ sender, text, chart, isLoading, isTiming }) => {
       )}
     </div>
   );
-};
+});
 
 const styles = {
   messageWrapper: {
