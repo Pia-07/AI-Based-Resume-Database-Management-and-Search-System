@@ -1,6 +1,9 @@
+import os
 from dotenv import load_dotenv
-load_dotenv()
 
+# Load .env from the parent directory (my-app)
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.env"))
+load_dotenv(dotenv_path=env_path)
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -10,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from .routes.auth_routes import router as auth_router
 from .routes.resume_routes import router as resume_router
 from .routes.chat_routes import router as chat_router
+from .routes.quiz_routes import router as quiz_router
 
 
 @asynccontextmanager
@@ -57,6 +61,18 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, background_prewarm)
 
+    # 3. Auto-generate quizzes for hardcoded candidates (background thread)
+    def auto_generate_quizzes():
+        try:
+            from .services.quiz_service import ensure_candidates_quizzes
+            print("📝 Auto-generating quizzes for candidates...")
+            ensure_candidates_quizzes()
+            print("✅ Candidate quizzes ready")
+        except Exception as e:
+            print(f"⚠️ Quiz auto-generation failed (non-fatal): {e}")
+
+    loop.run_in_executor(None, auto_generate_quizzes)
+
     print("🟢 Startup complete — ready to serve requests")
     yield
     # ── SHUTDOWN ────────────────────────────────────────────
@@ -90,6 +106,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth")
 app.include_router(chat_router)
 app.include_router(resume_router)
+app.include_router(quiz_router)
 
 @app.get("/")
 def root():

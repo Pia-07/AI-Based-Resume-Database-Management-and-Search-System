@@ -64,33 +64,59 @@ class ModelManager:
         
         if not self._client:
             print("⚠️ ModelManager: No client available, returning zeros.")
-            return np.zeros((len(sentences), 768), dtype="float32")
+            return np.zeros((len(sentences), 3072), dtype="float32")
 
-        # Batch in chunks of 50 to avoid hitting rate limits or payload size limits
-        batch_size = 50
-        for i in range(0, len(sentences), batch_size):
+        # --- Rate-limit-aware batching ---
+        # Gemini free tier: 100 embed requests / minute / model.
+        # We use small batches (each API call = 1 request regardless of
+        # how many texts are in it) and pause to stay under the limit.
+        batch_size = 100
+        requests_this_window = 0
+        MAX_REQUESTS_PER_WINDOW = 14  # Gemini free tier is 15 requests/min
+        MAX_RETRIES = 3
+
+        total_batches = (len(sentences) + batch_size - 1) // batch_size
+        for batch_idx, i in enumerate(range(0, len(sentences), batch_size)):
             batch = sentences[i:i+batch_size]
-            # Truncate each text to 2048 chars for safety
             batch_texts = [text[:2048] for text in batch]
-            
-            try:
-                response = self._client.models.embed_content(
-                    model="gemini-embedding-001",
-                    contents=batch_texts
-                )
-                
-                for emb in response.embeddings:
-                    embeddings.append(emb.values)
-                    
-                # Small sleep to be nice to the rate limits if there are many batches
-                if i + batch_size < len(sentences):
-                    time.sleep(1.0)
-                    
-            except Exception as e:
-                print(f"⚠️ Gemini batch embedding error: {e}")
-                # Fallback zero vectors for this batch
+
+            # Pace requests: if we've used most of our per-minute quota, wait
+            if requests_this_window >= MAX_REQUESTS_PER_WINDOW:
+                print(f"   ⏳ Rate-limit pause — waiting 61s to reset quota ({batch_idx+1}/{total_batches} batches done)")
+                time.sleep(61)
+                requests_this_window = 0
+
+            success = False
+            for attempt in range(MAX_RETRIES):
+                try:
+                    response = self._client.models.embed_content(
+                        model="gemini-embedding-001",
+                        contents=batch_texts
+                    )
+                    for emb in response.embeddings:
+                        embeddings.append(emb.values)
+                    requests_this_window += 1
+                    success = True
+                    break  # success — move to next batch
+                except Exception as e:
+                    err_str = str(e)
+                    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                        wait = min(30 * (2 ** attempt), 120)  # 30s, 60s, 120s
+                        print(f"   ⏳ Rate limited (attempt {attempt+1}/{MAX_RETRIES}), waiting {wait}s...")
+                        time.sleep(wait)
+                        requests_this_window = 0  # assume quota resets after wait
+                    else:
+                        print(f"⚠️ Gemini embedding error: {e}")
+                        break  # non-rate-limit error, don't retry
+
+            if not success:
+                print(f"   ⚠️ Batch {batch_idx+1} failed after retries, using zero vectors")
                 for _ in batch:
-                    embeddings.append([0.0] * 768)
+                    embeddings.append([0.0] * 3072)
+
+            # Small inter-batch delay to spread requests
+            if i + batch_size < len(sentences):
+                time.sleep(0.5)
 
         result = np.array(embeddings, dtype="float32")
 

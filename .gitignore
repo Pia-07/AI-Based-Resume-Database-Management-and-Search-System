@@ -40,3 +40,4 @@ models/
 uploads/
 temp/
 Backend/temp/
+Backend/.cache/

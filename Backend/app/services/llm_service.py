@@ -18,16 +18,38 @@ except ModuleNotFoundError:
 
 # Thread pool for timeout-guarded Gemini calls
 _llm_executor = ThreadPoolExecutor(max_workers=4)
-GEMINI_TIMEOUT_SECONDS = 30
+GEMINI_TIMEOUT_SECONDS = 60
 
 
 def _call_gemini(prompt: str) -> str:
-    """Synchronous Gemini API call (runs in thread pool)."""
-    response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt
-    )
-    return response.text.strip()
+    """Synchronous Gemini API call (runs in thread pool).
+    Tries multiple models in case one hits its per-model quota."""
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"]
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            last_error = e
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                print(f"⚠️ {model_name} quota exhausted, trying next model...")
+                import time
+                time.sleep(1)
+                continue
+            elif "503" in err_str or "500" in err_str or "UNAVAILABLE" in err_str:
+                print(f"⚠️ {model_name} server overloaded (503/500). Retrying next model.")
+                import time
+                time.sleep(2)
+                continue
+            else:
+                raise  # non-quota error, don't retry
+    raise last_error
+
 
 
 def generate_answer(
@@ -145,4 +167,11 @@ CRITICAL REMINDERS:
         print(f"❌ Gemini API error: {e}")
         import traceback
         traceback.print_exc()
-        return f"I apologize, but I encountered an API error: {str(e)}"
+        
+        err_str = str(e)
+        if "503" in err_str or "UNAVAILABLE" in err_str:
+             return "I'm currently receiving too many requests and the Google servers are overloaded. Please wait a moment and try again!"
+        elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+             return "The API rate limit has been exceeded. Please try again in a few minutes."
+             
+        return f"I apologize, but I encountered an API error: {err_str}"

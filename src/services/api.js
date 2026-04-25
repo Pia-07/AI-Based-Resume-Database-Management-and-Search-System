@@ -326,3 +326,108 @@ export const loginWithGoogle = async (credential) => {
 
   return await response.json();
 };
+
+// ===========================
+// QUIZ APIs — Skill Verification System
+// ===========================
+
+/**
+ * Generate a skill verification quiz for a candidate
+ */
+export const generateQuiz = async (candidateName, candidateEmail, skills, timeLimitMinutes = 20) => {
+  const userId = getUserId();
+  const response = await fetchWithRetry(`${BASE_URL}/quiz/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      candidate_name: candidateName,
+      candidate_email: candidateEmail,
+      skills: skills,
+      user_id: userId || "anonymous",
+      time_limit_minutes: timeLimitMinutes,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "Unknown error");
+    throw new Error(`Quiz generation failed (${response.status}): ${errText}`);
+  }
+
+  return await response.json();
+};
+
+/**
+ * Send quiz invitation email (static simulation)
+ */
+export const sendQuizEmail = async (quizId, candidateName, candidateEmail, quizLink, timeLimitMinutes = 20) => {
+  const response = await fetch(`${BASE_URL}/quiz/send-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quiz_id: quizId,
+      candidate_name: candidateName,
+      candidate_email: candidateEmail,
+      quiz_link: quizLink,
+      time_limit_minutes: timeLimitMinutes,
+    }),
+  });
+
+  return await response.json();
+};
+
+/**
+ * Get quiz by ID (public — no auth required)
+ */
+export const getQuiz = async (quizId) => {
+  const response = await fetch(`${BASE_URL}/quiz/${encodeURIComponent(quizId)}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch quiz");
+  }
+  return await response.json();
+};
+
+/**
+ * Submit quiz answers
+ */
+export const submitQuiz = async (quizId, answers) => {
+  const response = await fetch(`${BASE_URL}/quiz/${encodeURIComponent(quizId)}/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "Unknown error");
+    throw new Error(`Quiz submission failed (${response.status}): ${errText}`);
+  }
+
+  return await response.json();
+};
+
+/**
+ * Get all quiz results (HR dashboard) — no user filter (system-generated)
+ */
+export const getQuizResults = async () => {
+  const response = await fetch(`${BASE_URL}/quiz/results`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch quiz results");
+  }
+  return await response.json();
+};
+
+/**
+ * Send quiz emails to ALL pending candidates simultaneously.
+ * HR clicks one button — no manual email input required.
+ */
+export const sendAllQuizEmails = async () => {
+  const response = await fetch(`${BASE_URL}/quiz/send-all`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to send quiz emails");
+  }
+  return await response.json();
+};
+
+

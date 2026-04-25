@@ -94,6 +94,14 @@ async def chat(request: ChatRequest):
     
     print(f"📩 Chat Query: '{query}'")
     
+    # 🚨 PREEMPTIVE CHECK: Bypass all LLM/Intent logic if index is currently building
+    index_stats = get_index_stats()
+    if index_stats.get("status") == "building":
+         return {
+             "reply": "I am currently analyzing and indexing all the resumes in the background. Please wait a minute while I finish my scan before asking complex queries!",
+             "chart": None
+         }
+         
     # Intent detection — CPU-bound, offload to thread pool
     intent, chart_preference = await asyncio.gather(
         _run_sync(detect_intent, query),

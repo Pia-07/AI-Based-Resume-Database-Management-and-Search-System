@@ -3,19 +3,28 @@ Embedding Service — Vector search using numpy cosine similarity.
 
 Replaces FAISS with pure numpy for Render free-tier compatibility.
 Uses Gemini API embeddings via model_manager.
+Includes disk-based caching to avoid re-embedding on every restart.
 """
 
+import os
+import json
 import numpy as np
 import hashlib
 from typing import List, Dict, Optional
 
 from .model_manager import model_manager
 
+# Cache directory for persisted embeddings
+CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cache")
+CACHE_FILE = os.path.join(CACHE_DIR, "embeddings_cache.npz")
+CACHE_META_FILE = os.path.join(CACHE_DIR, "embeddings_meta.json")
+
 # In-memory vector store
 _chunk_texts: List[str] = []
 _chunk_metadata: List[Dict] = []
 _embeddings_matrix: Optional[np.ndarray] = None
 _cache_hash: Optional[str] = None
+_is_building: bool = False
 
 
 def _compute_cache_hash(resumes: List[Dict]) -> str:
@@ -60,12 +69,61 @@ def _chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> List[st
     return chunks
 
 
+def _save_cache(cache_hash: str):
+    """Save embeddings and metadata to disk."""
+    global _embeddings_matrix, _chunk_texts, _chunk_metadata
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        np.savez_compressed(CACHE_FILE, embeddings=_embeddings_matrix)
+        meta = {
+            "cache_hash": cache_hash,
+            "chunk_texts": _chunk_texts,
+            "chunk_metadata": _chunk_metadata,
+        }
+        with open(CACHE_META_FILE, "w") as f:
+            json.dump(meta, f)
+        print(f"💾 Embeddings cached to disk ({len(_chunk_texts)} chunks)")
+    except Exception as e:
+        print(f"⚠️ Failed to save embedding cache: {e}")
+
+
+def _load_cache(expected_hash: str) -> bool:
+    """Try to load embeddings from disk cache. Returns True if successful."""
+    global _embeddings_matrix, _chunk_texts, _chunk_metadata, _cache_hash
+    try:
+        if not os.path.exists(CACHE_FILE) or not os.path.exists(CACHE_META_FILE):
+            return False
+
+        with open(CACHE_META_FILE, "r") as f:
+            meta = json.load(f)
+
+        if meta.get("cache_hash") != expected_hash:
+            print("ℹ️ Disk cache hash mismatch — will rebuild embeddings")
+            return False
+
+        data = np.load(CACHE_FILE)
+        _embeddings_matrix = data["embeddings"].astype("float32")
+        _chunk_texts = meta["chunk_texts"]
+        _chunk_metadata = meta["chunk_metadata"]
+        _cache_hash = expected_hash
+
+        print(f"⚡ Loaded embeddings from disk cache ({len(_chunk_texts)} chunks) — zero API calls!")
+        return True
+    except Exception as e:
+        print(f"⚠️ Failed to load embedding cache: {e}")
+        return False
+
+
 def build_vector_store(resumes: List[Dict], force_rebuild: bool = False) -> bool:
     """
     Build / rebuild vector index from resumes with intelligent chunking.
-    Uses caching to avoid rebuilding on every request.
+    Uses disk caching to avoid regenerating embeddings on every restart.
     """
-    global _chunk_texts, _chunk_metadata, _embeddings_matrix, _cache_hash
+    global _chunk_texts, _chunk_metadata, _embeddings_matrix, _cache_hash, _is_building
+
+    if _is_building:
+        print("⚠️ Vector index build already in progress. Skipping duplicate build.")
+        return False
 
     if not resumes:
         _chunk_texts = []
@@ -75,12 +133,17 @@ def build_vector_store(resumes: List[Dict], force_rebuild: bool = False) -> bool
         print("⚠️ No resumes found to index")
         return False
 
-    # Check if we can use cached index
+    # Check if we can use in-memory cached index
     new_hash = _compute_cache_hash(resumes)
     if not force_rebuild and _cache_hash == new_hash and _embeddings_matrix is not None:
-        print(f"✅ Using cached vector index ({len(_chunk_texts)} chunks)")
+        print(f"✅ Using in-memory cached vector index ({len(_chunk_texts)} chunks)")
         return False
 
+    # Try to load from disk cache (avoids API calls entirely)
+    if not force_rebuild and _load_cache(new_hash):
+        return True
+
+    _is_building = True
     # Build new index with chunking
     print(f"🔄 Building vector index from {len(resumes)} resumes...")
 
@@ -109,6 +172,7 @@ def build_vector_store(resumes: List[Dict], force_rebuild: bool = False) -> bool
         print("⚠️ No valid text chunks extracted from resumes")
         _embeddings_matrix = None
         _cache_hash = None
+        _is_building = False
         return False
 
     # Create embeddings via Gemini API
@@ -121,10 +185,15 @@ def build_vector_store(resumes: List[Dict], force_rebuild: bool = False) -> bool
 
     _cache_hash = new_hash
 
+    # Save to disk for next startup
+    _save_cache(new_hash)
+
     print(f"✅ Vector index built: {len(_chunk_texts)} chunks from {len(resumes)} resumes")
     print(f"📐 Embedding dimension: {_embeddings_matrix.shape[1]}")
 
+    _is_building = False
     return True
+
 
 
 def search_similar(query: str, k: int = 10) -> List[str]:
@@ -172,11 +241,13 @@ def search_similar(query: str, k: int = 10) -> List[str]:
 def get_index_stats() -> Dict:
     """Get statistics about the current vector index."""
     if _embeddings_matrix is None:
-        return {"status": "not_initialized", "chunks": 0, "resumes": 0}
+        status = "building" if _is_building else "not_initialized"
+        return {"status": status, "chunks": 0, "resumes": 0}
 
     unique_resumes = len(set(m.get("resume_name") for m in _chunk_metadata))
+    status = "building" if _is_building else "ready"
     return {
-        "status": "ready",
+        "status": status,
         "chunks": len(_chunk_texts),
         "resumes": unique_resumes,
         "cache_hash": _cache_hash[:8] if _cache_hash else None

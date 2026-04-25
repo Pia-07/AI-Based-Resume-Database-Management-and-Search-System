@@ -29,3 +29,4 @@ resume_collection = db["resumes"]
 job_collection = db["jobs"]
 user_collection = db["users"]
 chat_collection = db["chats"]  # Chat history storage
+quiz_collection = db["quizzes"]  # Skill verification quizzes

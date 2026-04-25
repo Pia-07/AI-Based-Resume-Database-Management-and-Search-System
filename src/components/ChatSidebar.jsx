@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 
 /**
@@ -25,6 +25,10 @@ const ChatSidebar = ({
 }) => {
   const [hoveredChat, setHoveredChat] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get logged-in user email from localStorage
+  const userEmail = localStorage.getItem("userEmail") || "";
 
   const handleLogout = () => {
     localStorage.clear();
@@ -135,12 +139,31 @@ const ChatSidebar = ({
           )}
         </div>
 
+        {/* Dashboard Link */}
+        <button
+          style={{
+            ...styles.dashboardBtn,
+            background: location.pathname === "/dashboard" ? "#e0e7ff" : "transparent",
+          }}
+          onClick={() => navigate("/dashboard")}
+        >
+          <span style={styles.footerIcon}>📊</span>
+          <span style={styles.footerText}>HR Dashboard</span>
+        </button>
+
         {/* Footer */}
         <div style={styles.footer}>
-          <div style={styles.footerItem}>
-            <span style={styles.footerIcon}>📧</span>
-            <span style={styles.footerText}>support@smarthire.ai</span>
-          </div>
+          {userEmail ? (
+            <div style={styles.footerItem}>
+              <span style={styles.footerIcon}>👤</span>
+              <span style={styles.footerText}>{userEmail}</span>
+            </div>
+          ) : (
+            <div style={styles.footerItem}>
+              <span style={styles.footerIcon}>📧</span>
+              <span style={styles.footerText}>support@smarthire.ai</span>
+            </div>
+          )}
           <button style={styles.logoutBtn} onClick={handleLogout}>
             <span style={styles.footerIcon}>🚪</span>
             <span style={styles.footerText}>Logout</span>
@@ -148,7 +171,6 @@ const ChatSidebar = ({
         </div>
       </aside>
 
-      {/* Mobile Toggle Button */}
       {isCollapsed && (
         <button
           style={styles.mobileToggleBtn}
@@ -157,14 +179,6 @@ const ChatSidebar = ({
         >
           ☰
         </button>
-      )}
-
-      {/* Mobile Overlay */}
-      {!isCollapsed && (
-        <div
-          style={styles.overlay}
-          onClick={onToggleCollapse}
-        />
       )}
     </>
   );
@@ -328,6 +342,21 @@ const styles = {
     transition: "all 150ms ease",
     flexShrink: 0,
   },
+  dashboardBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    margin: "4px 8px",
+    padding: "12px",
+    borderRadius: "10px",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "var(--text-primary)",
+    transition: "all 150ms ease",
+    boxShadow: "none",
+  },
   footer: {
     padding: "16px",
     borderTop: "1px solid #e2e8f0",
@@ -365,16 +394,7 @@ const styles = {
     fontWeight: "500",
     width: "100%",
   },
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0, 0, 0, 0.3)",
-    display: "block", // Changed from 'none' to show overlay on mobile
-    zIndex: 99,
-  },
+  // overlay removed — sidebar is non-blocking
   mobileToggleBtn: {
     position: "fixed",
     left: "12px",
