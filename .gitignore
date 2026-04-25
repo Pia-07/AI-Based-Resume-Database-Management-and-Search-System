@@ -41,3 +41,7 @@ uploads/
 temp/
 Backend/temp/
 Backend/.cache/
+
+# ML models
+Backend/models/
+models/
