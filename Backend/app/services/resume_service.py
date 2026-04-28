@@ -80,14 +80,47 @@ def get_resume_content_for_context(resume_doc: dict) -> str:
     Returns:
         String representation of the resume content
     """
-    # If raw_text is available and not empty, use it
+    # Build structured context from parsed fields first (better grounding for semantic queries)
+    parts = []
+
+    if resume_doc.get("name"):
+        parts.append(f"Candidate Name: {resume_doc['name']}")
+
+    # Add field summary for better skill-based matching
+    skills = resume_doc.get("skills", [])
+    if skills:
+        parts.append("Skills: " + ", ".join(str(s).strip() for s in skills if s))
+
+    location = resume_doc.get("location")
+    if location:
+        parts.append(f"Location: {location}")
+
+    exp_years = resume_doc.get("experience_years", 0)
+    if exp_years > 0:
+        parts.append(f"Experience Years: {exp_years}")
+    elif resume_doc.get("is_fresher"):
+        parts.append("Experience: Fresher / Entry-level")
+
+    if resume_doc.get("summary"):
+        parts.append(f"Summary: {resume_doc['summary']}")
+
+    if resume_doc.get("certifications"):
+        certs = resume_doc.get("certifications")
+        if isinstance(certs, list):
+            parts.append("Certifications: " + ", ".join(str(c) for c in certs))
+        else:
+            parts.append(f"Certifications: {certs}")
+
+    # If raw_text exists, append it as a fallback (complete resume details)
     raw_text = resume_doc.get("raw_text", "")
     if raw_text and len(raw_text.strip()) > 50:
-        return raw_text
-    
-    # Otherwise, build context from structured fields
-    parts = []
-    
+        parts.append("Resume Text:")
+        parts.append(raw_text.strip())
+
+    if parts:
+        return "\n".join(parts)
+
+    return "No resume data available"    
     if resume_doc.get("name"):
         parts.append(f"Candidate Name: {resume_doc['name']}")
     

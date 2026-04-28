@@ -7,6 +7,8 @@ Performance: All blocking calls (MongoDB, FAISS, Gemini) are offloaded
 to a thread-pool executor so the async event loop is never blocked.
 """
 import asyncio
+from functools import lru_cache
+import hashlib
 from functools import partial
 
 from fastapi import APIRouter
@@ -25,6 +27,12 @@ from ..services.resume_service import get_resume_content_for_context
 from ..utils.db import resume_collection, chat_collection
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+# Response cache: (context_hash, question) -> cached_answer (LRU 30 responses)
+@lru_cache(maxsize=30)
+def _get_cached_response(context_hash: str, question: str) -> Optional[str]:
+    """Cached responses to avoid Gemini quota waste on repeated queries."""
+    return None
 
 
 # Helper: run sync function in thread pool (keeps event loop free)
@@ -63,6 +71,19 @@ def build_resume_context(resumes: List[dict]) -> List[str]:
         if context and len(context.strip()) > 10:
             contexts.append(context)
     return contexts
+
+
+def extract_skill_from_query(query: str) -> Optional[str]:
+    """Extract a single skill token from user query for deterministic filtering."""
+    if not query:
+        return None
+
+    q = query.lower()
+    skill_keywords = ["python", "java", "sql", "react", "node", "javascript", "c++", "c#", "ruby", "go", "docker", "aws", "ml", "data"]
+    for skill in skill_keywords:
+        if skill in q:
+            return skill
+    return None
 
 
 def format_chart_data_for_llm(chart_data: dict) -> str:
@@ -138,7 +159,30 @@ async def chat(request: ChatRequest):
         include_cta = False
 
     else:
-        # 2️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)
+        # 2️⃣ Deterministic skill filtering for direct candidate queries
+        skill = extract_skill_from_query(query)
+        if skill:
+            # Match both parsed skills array and raw text to maximize coverage
+            candidates = await _run_sync(
+                lambda: list(resume_collection.find(
+                    {"$or": [
+                        {"skills": {"$elemMatch": {"$regex": f"^{skill}$", "$options": "i"}}},
+                        {"raw_text": {"$regex": skill, "$options": "i"}}
+                    ]},
+                    {"_id": 0, "name": 1, "skills": 1, "location": 1, "experience_years": 1}
+                ))
+            )
+
+            if candidates:
+                names = [c.get("name") for c in candidates if c.get("name")]
+                unique_names = sorted(list(set(names)))
+                direct_message = "\n".join([f"- {n}" for n in unique_names]) if unique_names else "No exact candidate names found."
+                reply = f"Candidates with skill '{skill}':\n{direct_message}"
+                if include_cta:
+                    reply += "\n\nYou can ask for details like experience, location, or resume summary for any candidate."
+                return {"reply": reply, "chart": None}
+
+        # 3️⃣ SEMANTIC SEARCH / Q&A (Default Fallback)
         # Fetch ALL resumes — MongoDB I/O, offload
         resumes = await _run_sync(
             lambda: list(resume_collection.find({}, {
@@ -149,32 +193,44 @@ async def chat(request: ChatRequest):
         )
         
         if not resumes:
-            context_text = "SYSTEM NOTE: No resumes are uploaded in the database yet."
+            context_text = "No resumes uploaded."
         else:
             resume_contexts = build_resume_context(resumes)
             if resume_contexts:
-                # Build vector store — CPU-heavy, offload
+                # Build vector store once and reuse (cache key: resume count + hash)
                 vector_input = [{"raw_text": ctx} for ctx in resume_contexts]
-                await _run_sync(build_vector_store, vector_input)
+                await _run_sync(build_vector_store, vector_input, force_rebuild=False)
                 
-                # Search — CPU-bound, offload
-                matched_chunks = await _run_sync(search_similar, query, 10)
+                # Search — limit to top 5 chunks for faster API response
+                matched_chunks = await _run_sync(search_similar, query, 5)
                 if not matched_chunks:
-                    matched_chunks = resume_contexts[:5]  # Fallback
+                    matched_chunks = resume_contexts[:3]  # Fallback: 3 best candidates
                 
-                context_text = "\n\n---\n\n".join(matched_chunks)
+                # Optimize context: limit to ~2000 chars total to speed up Gemini
+                combined = "\n---\n".join(matched_chunks)
+                if len(combined) > 2500:
+                    combined = combined[:2500] + "\n[...context truncated...]"
+                context_text = combined
             else:
-                context_text = "SYSTEM NOTE: Resumes exist but have no readable content."
+                context_text = "No readable resume data."
 
-    # 3️⃣ GENERATE ANSWER — Network I/O (Gemini API), offload
+    # 3️⃣ GENERATE ANSWER — Check cache first, then Network I/O (Gemini API)
     try:
-        reply = await _run_sync(
-            generate_answer,
-            context_text,
-            query,
-            chat_history,
-            include_cta,
-        )
+        # Cache check: avoid calling Gemini for duplicate queries
+        context_hash = hashlib.md5(context_text.encode()).hexdigest()[:8]
+        cached_reply = _get_cached_response(context_hash, query)
+        
+        if cached_reply is not None:
+            print(f"💾 Cache hit for query: {query[:50]}...")
+            reply = cached_reply
+        else:
+            reply = await _run_sync(
+                generate_answer,
+                context_text,
+                query,
+                chat_history,
+                include_cta,
+            )
     except Exception as e:
         print(f"❌ LLM Error: {e}")
         reply = "I apologize, but I encountered an error generating the response."

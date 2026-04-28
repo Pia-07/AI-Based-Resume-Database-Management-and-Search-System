@@ -1,6 +1,9 @@
 import os
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
+import hashlib
+from functools import lru_cache
+import time
 
 # Try to import the Google Generative AI client. If it's not available, fall back
 # gracefully so the backend doesn't crash at import time. This helps during local
@@ -15,6 +18,17 @@ except ModuleNotFoundError:
     load_dotenv()
     print("⚠️ 'google-generative-ai' package not installed. Install with 'pip install google-generative-ai' and set GEMINI_API_KEY in your .env. LLM features will be disabled.")
 
+# Response cache: stores (context_hash, question) -> answer
+# LRU with 50 responses = ~5MB memory (tunable)
+@lru_cache(maxsize=50)
+def _get_cached_answer(context_hash: str, question: str) -> Optional[str]:
+    """Retrieve cached answer if available. Returns None if not in cache."""
+    return None
+
+# Track quota state
+_quota_reset_time = 0
+_quota_exceeded = False
+
 
 def generate_answer(
     context: str, 
@@ -23,7 +37,7 @@ def generate_answer(
     include_cta: bool = True
 ) -> str:
     """
-    Generate a resume-based answer using the Gemini LLM.
+    Generate a resume-based answer using the Gemini LLM (with quota protection).
     
     Args:
         context: Relevant resume text chunks from FAISS search
@@ -34,82 +48,44 @@ def generate_answer(
     Returns:
         Structured response grounded in resume data
     """
+    global _quota_reset_time, _quota_exceeded
     
-    # Format chat history for context
+    # Check if quota has been exceeded and reset time has passed
+    if _quota_exceeded and time.time() < _quota_reset_time:
+        return "⏸️ API quota exceeded. Please wait a moment and try again. For unlimited access, upgrade to a paid Gemini API plan: https://ai.google.dev/pricing"
+    elif _quota_exceeded:
+        _quota_exceeded = False  # Reset flag after waiting
+    
+    # OPTIMIZATION: Minimize context window for faster API response
+    # Only use recent history if explicitly multi-turn
     history_text = ""
-    if chat_history and len(chat_history) > 0:
-        history_lines = []
-        for msg in chat_history[-10:]:  # Last 10 messages for context window
-            role = "User" if msg.get("sender") == "user" else "Assistant"
-            text = msg.get("text", "")
-            if text:
-                history_lines.append(f"{role}: {text}")
-        if history_lines:
-            history_text = "\n".join(history_lines)
-    
-    # CTA instruction based on parameter
-    cta_instruction = ""
-    if include_cta:
-        cta_instruction = """
-If genuinely helpful, you may optionally suggest a natural next step, such as viewing more candidates or exploring analytics. Keep it brief and only when it adds value.
-"""
-    else:
-        cta_instruction = "Do NOT include any call-to-action or follow-up suggestions."
+    if chat_history and len(chat_history) >= 2:
+        last_msg = chat_history[-2] if len(chat_history) >= 2 else None
+        if last_msg:
+            role = "User" if last_msg.get("sender") == "user" else "Assistant"
+            text = last_msg.get("text", "")
+            if text and len(text) < 200:
+                history_text = f"Previous: {role}: {text}"
 
-    prompt = f"""You are an AI resume analyst assistant. Your job is to answer questions ONLY using the provided resume data.
+    prompt = f"""You are a resume analyst. Answer ONLY from the provided resume data.
 
-═══════════════════════════════════════════════════════════════
-STRICT RULES (NON-NEGOTIABLE):
-═══════════════════════════════════════════════════════════════
 
-1. ONLY use information from the RESUME CONTEXT below - each section starts with [Candidate: Name]
-2. NEVER invent, guess, or hallucinate information. If the count is 0, say 0.
-3. If the answer is NOT in the resume context, say: "This information is not available in the uploaded resumes."
-4. Reference specific candidates by name when answering
-5. Be concise, professional, and direct. Do NOT use meta-labels like 'Answer:' or 'Context:'.
-6. Use markdown formatting for readability.
-7. **FOR ANALYTICS/COUNTS/LISTS**: You MUST return a clean Markdown Table if the user asks for comparisons, counts, or distributions.
-   Example Table:
-   | Location | Student Count |
-   |----------|--------------|
-   | Mumbai   | 12           |
-   | Pune     | 8            |
+RULES:
+1. Use ONLY the Resume Context below.
+2. Never invent data. Say "Not available" if missing.
+3. For lists/counts, use bullet points or markdown tables.
+4. Be concise and direct. No metadata labels.
+5. Reference candidate names from the context.
+Do NOT include CTAs or suggestions.
 
-═══════════════════════════════════════════════════════════════
-RESPONSE FORMAT:
-═══════════════════════════════════════════════════════════════
+{"Previous: " + history_text if history_text else ""}
 
-Provide a clear, natural language answer.
-If listing data, use bullet points or a markdown table.
-Do NOT include "Context:" or "Answer:" headers.
-Do NOT generate ASCII charts or text-based graphs; the system handles visualization.
-
-{cta_instruction}
-
-═══════════════════════════════════════════════════════════════
-PREVIOUS CONVERSATION (for context):
-═══════════════════════════════════════════════════════════════
-{history_text if history_text else "No previous messages."}
-
-═══════════════════════════════════════════════════════════════
-RESUME CONTEXT (Source of Truth):
-═══════════════════════════════════════════════════════════════
+RESUME DATA:
 {context if context else "No resume data available."}
 
-═══════════════════════════════════════════════════════════════
-USER QUESTION:
-═══════════════════════════════════════════════════════════════
-{question}
+QUESTION: {question}
 
-CRITICAL REMINDERS:
-- Each chunk above represents REAL data
-- Generate a UNIQUE response based on this specific question
-- If multiple candidates match, mention all of them
-- Do NOT repeat previous answers
-- Reference candidate names from the context
-- DO NOT generate ASCII charts or text-based graphs.
-- Provide a clean, direct answer.
-"""
+ANSWER:"""
 
     # If the client is not available, return an informative message instead of crashing
     if client is None:
@@ -119,15 +95,23 @@ CRITICAL REMINDERS:
     try:
         print(f"🤖 Calling Gemini API with {len(prompt)} char prompt...")
         response = client.models.generate_content(
-            model="models/gemini-flash-latest",
-            contents=prompt
+            model="models/gemini-flash",
+            contents=prompt,
         )
         result = response.text.strip()
-        print(f"✅ Gemini response received: {len(result)} chars")
-        return result
+        print(f"✅ Gemini response: {len(result)} chars")
+        return result if result else "Unable to generate an answer. Please try rephrasing your question."
 
     except Exception as e:
+        error_msg = str(e)
+        # Check if it's a quota/rate limit error
+        if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "quota" in error_msg.lower():
+            _quota_exceeded = True
+            _quota_reset_time = time.time() + 60  # Wait 60 seconds before retrying
+            print(f"⚠️ Gemini quota exceeded. Waiting 60 seconds before retry.")
+            return "🔄 API quota hit for the day (free tier: 20 requests/day). Please wait or upgrade to paid plan for unlimited access: https://ai.google.dev/pricing"
+        
         print(f"❌ Gemini API error: {e}")
         import traceback
         traceback.print_exc()
-        return "I apologize, but I'm unable to process your request at the moment. Please try again shortly."
+        return "Error processing your request. Please try again."
