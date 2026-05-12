@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+python-dotenv
+pymongo
+dnspython
+pydantic
+
+numpy
+
+python-multipart
+bcrypt
+
+requests
+httpx
+google-genai
+pdfplumber

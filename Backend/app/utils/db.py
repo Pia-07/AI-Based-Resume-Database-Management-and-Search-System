@@ -23,15 +23,9 @@ else:
     except Exception as e:
         print(f"❌ Database connection failed: {e}", file=sys.stderr)
 
-# Define collections safely
-if db is not None:
-    resume_collection = db["resumes"]
-    job_collection = db["jobs"]
-    user_collection = db["users"]
-    chat_collection = db["chats"]
-else:
-    print("❌ Critical: Database not connected. Collections are not initialized.", file=sys.stderr)
-    resume_collection = None
-    job_collection = None
-    user_collection = None
-    chat_collection = None
+# Collections
+resume_collection = db["resumes"]
+job_collection = db["jobs"]
+user_collection = db["users"]
+chat_collection = db["chats"]  # Chat history storage
+quiz_collection = db["quizzes"]  # Skill verification quizzes

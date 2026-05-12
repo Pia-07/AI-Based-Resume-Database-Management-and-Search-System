@@ -40,7 +40,15 @@ models/
 uploads/
 temp/
 Backend/temp/
+<<<<<<< HEAD
 
 build/
 Backend/models/
 .vercel
+=======
+Backend/.cache/
+
+# ML models
+Backend/models/
+models/
+>>>>>>> df43e14501ebf5a31a5d831234b64bd458aeb7aa

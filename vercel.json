@@ -17,7 +17,35 @@
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
         }
+<<<<<<< HEAD
       ]
     }
   ]
+=======
+    ],
+    "headers": [
+        {
+            "source": "/:path*",
+            "headers": [
+                {
+                    "key": "Cross-Origin-Opener-Policy",
+                    "value": "same-origin-allow-popups"
+                },
+                {
+                    "key": "Cross-Origin-Embedder-Policy",
+                    "value": "unsafe-none"
+                }
+            ]
+        },
+        {
+            "source": "/assets/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=31536000, immutable"
+                }
+            ]
+        }
+    ]
+>>>>>>> df43e14501ebf5a31a5d831234b64bd458aeb7aa
 }

@@ -1,6 +1,9 @@
+import os
 from dotenv import load_dotenv
-load_dotenv()
 
+# Load .env from the parent directory (my-app)
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.env"))
+load_dotenv(dotenv_path=env_path)
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -10,45 +13,66 @@ from fastapi.staticfiles import StaticFiles
 from .routes.auth_routes import router as auth_router
 from .routes.resume_routes import router as resume_router
 from .routes.chat_routes import router as chat_router
+from .routes.quiz_routes import router as quiz_router
+from .routes.students_routes import router as students_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle hook."""
     # ── STARTUP ─────────────────────────────────────────────
-    print("🚀 Startup: Pre-loading models and warming caches...")
+    print("🚀 Startup: Initializing lightweight API-based services...")
 
-    # 1. Trigger SentenceTransformer load (singleton import does this)
+    # 1. Initialize model manager (now just API config, no heavy model loading)
     from .services.model_manager import model_manager  # noqa: F811
-    print(f"✅ SentenceTransformer ready")
+    print("✅ Gemini API embedding service ready")
 
-    # 2. Pre-warm FAISS index with existing resumes
-    try:
-        from .utils.db import resume_collection
-        from .services.embedding_service import build_vector_store
-        from .services.resume_service import get_resume_content_for_context
+    # 2. Pre-warm vector index with existing resumes (non-blocking)
+    def background_prewarm(*args, **kwargs):
+        try:
+            from .utils.db import resume_collection
+            from .services.embedding_service import build_vector_store
+            from .services.resume_service import get_resume_content_for_context
 
-        resumes = list(resume_collection.find({}, {
-            "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
-            "skills": 1, "experience_years": 1, "location": 1,
-            "education": 1, "experience": 1, "summary": 1, "certifications": 1
-        }))
-        if resumes:
-            contexts = []
-            for r in resumes:
-                ctx = get_resume_content_for_context(r)
-                if ctx and len(ctx.strip()) > 10:
-                    contexts.append(ctx)
-            if contexts:
-                vector_input = [{"raw_text": c} for c in contexts]
-                build_vector_store(vector_input)
-                print(f"✅ FAISS index pre-warmed with {len(contexts)} resume chunks")
+            print("⏳ Background vector index pre-warming started...")
+            resumes = list(resume_collection.find({}, {
+                "_id": 0, "raw_text": 1, "name": 1, "email": 1, "phone": 1,
+                "skills": 1, "experience_years": 1, "location": 1,
+                "education": 1, "experience": 1, "summary": 1, "certifications": 1
+            }))
+            if resumes:
+                contexts = []
+                for r in resumes:
+                    ctx = get_resume_content_for_context(r)
+                    if ctx and len(ctx.strip()) > 10:
+                        contexts.append(ctx)
+                if contexts:
+                    vector_input = [{"raw_text": c} for c in contexts]
+                    build_vector_store(vector_input)
+                    print(f"✅ Vector index pre-warmed with {len(contexts)} resume chunks")
+                else:
+                    print("⚠️ Resumes exist but no readable content for indexing")
             else:
-                print("⚠️ Resumes exist but no readable content for FAISS")
-        else:
-            print("ℹ️ No resumes in DB yet — FAISS will build on first query")
-    except Exception as e:
-        print(f"⚠️ FAISS pre-warm failed (non-fatal): {e}")
+                print("ℹ️ No resumes in DB yet — vector index will build on first query")
+        except Exception as e:
+            print(f"⚠️ Vector index pre-warm failed (non-fatal): {e}")
+
+    # Start the pre-warming in a background thread so it doesn't block server startup
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, background_prewarm)
+
+    # 3. Auto-generate quizzes for hardcoded candidates (background thread)
+    def auto_generate_quizzes():
+        try:
+            from .services.quiz_service import ensure_candidates_quizzes
+            print("📝 Auto-generating quizzes for candidates...")
+            ensure_candidates_quizzes()
+            print("✅ Candidate quizzes ready")
+        except Exception as e:
+            print(f"⚠️ Quiz auto-generation failed (non-fatal): {e}")
+
+    loop.run_in_executor(None, auto_generate_quizzes)
 
     print("🟢 Startup complete — ready to serve requests")
     yield
@@ -72,7 +96,8 @@ app.add_middleware(
         "http://127.0.0.1:5174",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        # Production: set FRONTEND_URL in Render env vars (e.g. https://smarthire.vercel.app)
+        "https://my-app-ruddy-five.vercel.app",  # Production frontend
+        # Production: set FRONTEND_URL in Render env vars
         *([os.getenv("FRONTEND_URL")] if os.getenv("FRONTEND_URL") else []),
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
@@ -84,6 +109,8 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth")
 app.include_router(chat_router)
 app.include_router(resume_router)
+app.include_router(quiz_router)
+app.include_router(students_router)
 
 @app.get("/")
 def root():

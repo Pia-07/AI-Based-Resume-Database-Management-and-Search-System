@@ -36,3 +36,4 @@ API base defaults to `http://localhost:8000/api`. Override with `VITE_API_BASE`.
 ## Notes / Next Steps
 - Swap the embedding model or add reranking as needed.
 - Add authentication, PII handling, and persistence (Postgres/pgvector) for production.
+AIzaSyBi1TRQzX1DlgRr06TiAp2lRgt0yzzoXKY

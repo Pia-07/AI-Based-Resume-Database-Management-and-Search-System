@@ -29,24 +29,29 @@ class GoogleAuthRequest(BaseModel):
 
 @router.post("/signup")
 async def signup(data: AuthRequest):
-    existing = await _run_sync(user_collection.find_one, {"email": data.email})
-    if existing:
-        return {"error": "User already exists"}
+    try:
+        existing = await _run_sync(user_collection.find_one, {"email": data.email})
+        if existing:
+            return {"error": "User already exists"}
 
-    user = {
-        "user_id": str(uuid.uuid4()),
-        "email": data.email,
-        "password_hash": hash_password(data.password),
-        "role": "HR",
-        "login_method": "password",
-    }
-    await _run_sync(user_collection.insert_one, user)
+        user = {
+            "user_id": str(uuid.uuid4()),
+            "email": data.email,
+            "password_hash": hash_password(data.password),
+            "role": "HR",
+            "login_method": "password",
+        }
+        await _run_sync(user_collection.insert_one, user)
 
-    return {
-        "message": "Signup successful",
-        "user_id": user["user_id"],
-        "email": user["email"],
-    }
+        return {
+            "message": "Signup successful",
+            "user_id": user["user_id"],
+            "email": user["email"],
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Signup failed: {str(e)}"}
 
 @router.post("/login")
 async def login(data: AuthRequest):
